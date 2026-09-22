@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   PALETTE — DESIGN_BRIEF.md §3.2
+
+   These hex values are contrast-checked. Every text token clears WCAG AA 4.5:1
+   against its own theme's `substrate`, and `copper` clears 4.5:1 in both themes
+   so it is safe for body-size links and for the focus ring.
+
+   Do not edit a value here without re-running the contrast check. The dark and
+   light accents are a token PAIR, not one hex reused: dark copper #F0803C on
+   the light background measures 2.43:1 and fails badly.
+
+   Naming is derived from printed-circuit materials, per the brief:
+   substrate (board) / copper (trace) / silk (silkscreen legend).
+   ========================================================================== */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --substrate: #0b0e11; /* page                                      */
+  --surface: #12161a; /* raised region                             */
+  --hairline: #1e252b; /* decorative rule            1.25:1         */
+  --edge: #5a646e; /* sole boundary of a control 3.21:1         */
+  --silk: #e6eaee; /* primary text              16.01:1         */
+  --silk-dim: #9aa6b2; /* secondary text             7.81:1         */
+  --silk-faint: #818e9b; /* mono labels, captions      5.78:1         */
+  --copper: #f0803c; /* accent                     7.24:1         */
+  --signal: #4fb6a8; /* status only                7.92:1         */
+
+  /* Trace segments already travelled. Non-text, decorative. */
+  --copper-spent: rgb(240 128 60 / 0.3);
+  --copper-wash: rgb(240 128 60 / 0.08);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --substrate: #f6f4f1; /* warm paper, not #FFF                      */
+  --surface: #ffffff;
+  --hairline: #e2ddd7; /*                            1.23:1         */
+  --edge: #8f867b; /*                            3.26:1         */
+  --silk: #15181b; /*                           16.23:1         */
+  --silk-dim: #545c64; /*                            6.19:1         */
+  --silk-faint: #5f6874; /*                            5.14:1         */
+  --copper: #9a4512; /*                            5.91:1         */
+  --signal: #1f6f66; /*                            5.43:1         */
+
+  --copper-spent: rgb(154 69 18 / 0.3);
+  --copper-wash: rgb(154 69 18 / 0.07);
+}
+
+/* ============================================================================
+   THEME
+
+   The defaults are cleared rather than extended. This is deliberate: it makes
+   the anti-pattern list in DESIGN_BRIEF.md §1 mechanically unbuildable instead
+   of merely discouraged.
+
+     --color-*  cleared  ->  `bg-indigo-500` does not compile
+     --radius-* cleared  ->  `rounded-2xl` does not compile (4px cap, §2.5)
+     --shadow-* cleared  ->  `shadow-lg` does not compile (no shadows, §2.5)
+     --text-*   cleared  ->  the scale is capped at six steps (§3.3)
+   ========================================================================== */
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-substrate: var(--substrate);
+  --color-surface: var(--surface);
+  --color-hairline: var(--hairline);
+  --color-edge: var(--edge);
+  --color-silk: var(--silk);
+  --color-silk-dim: var(--silk-dim);
+  --color-silk-faint: var(--silk-faint);
+  --color-copper: var(--copper);
+  --color-copper-spent: var(--copper-spent);
+  --color-copper-wash: var(--copper-wash);
+  --color-signal: var(--signal);
+
+  /* Two typefaces, exactly. §3.1 */
+  --font-*: initial;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Type scale, ratio 1.25, six steps. §3.3 */
+  --text-*: initial;
+  --text-micro: 0.8rem;
+  --text-micro--line-height: 1.45;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.45;
+  --text-h2: 1.5625rem;
+  --text-h2--line-height: 1.3;
+  --text-h1: 1.9531rem;
+  --text-h1--line-height: 1.2;
+  --text-display: clamp(2.25rem, 1.4rem + 3.6vw, 3.0518rem);
+  --text-display--line-height: 1.05;
+
+  /* Radius capped at 4px. §2.5 */
+  --radius-*: initial;
+  --radius-trace: 4px;
+
+  /* No shadows, either theme. §2.5 */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  /* One easing token, not ease-in-out on everything. §2.4 */
+  --ease-*: initial;
+  --ease-trace: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Two container widths only. §3.3 */
+  --container-*: initial;
+  --container-prose: 68ch;
+  --container-wide: 1120px;
+
+  /* Left gutter reserved for the trace bus. §2.1 Wide enough to hold the
+     bus SVG including its hover label, so nothing overlaps the content. */
+  --spacing-gutter: 15rem;
+}
+
+/* ============================================================================
+   BASE
+   ========================================================================== */
+
+html {
+  background-color: var(--substrate);
+  scroll-behavior: smooth;
+  /* The trace bus pads jump to sections; keep headings clear of the header. */
+  scroll-padding-top: 6rem;
+}
+
+body {
+  background-color: var(--substrate);
+  color: var(--silk);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display sizes get their own tracking. Stock Plex is too loose here. §3.1 */
+h1,
+h2 {
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+h3,
+h4 {
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+::selection {
+  background-color: var(--copper);
+  color: var(--substrate);
+}
+
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+/* Never rely on the browser default; §5 requires a visible ring everywhere. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ============================================================================
+   THEME TRANSITION
+
+   Only applied while [data-theme-transition] is present, which the toggle sets
+   for the duration of the switch and then removes. Doing it this way means the
+   transition cannot fire on first paint (nothing has changed yet), so there is
+   no flash and no steady-state cost.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme-transition],
+  :root[data-theme-transition] *,
+  :root[data-theme-transition] *::before,
+  :root[data-theme-transition] *::after {
+    transition:
+      background-color 280ms var(--ease-trace),
+      border-color 280ms var(--ease-trace),
+      color 280ms var(--ease-trace),
+      fill 280ms var(--ease-trace),
+      stroke 280ms var(--ease-trace) !important;
+  }
+}
+
+/* ============================================================================
+   THEME-DEPENDENT ICON SWAP
+
+   The toggle renders both glyphs and CSS picks one from the attribute the
+   blocking script already set. No JS state, so the correct glyph is present in
+   the very first paint and there is nothing to hydrate.
+   ========================================================================== */
+
+:root[data-theme="dark"] [data-theme-icon="light"],
+:root[data-theme="light"] [data-theme-icon="dark"] {
+  display: none;
+}
+
+/* ============================================================================
+   PACKET MOTION — §2.3
+
+   Fires on hover/focus, once, then stops. Never ambient, never looping.
+   A 7px dash travelling a path reads as a packet without any per-frame JS.
+   ========================================================================== */
+
+/* Every packet path carries pathLength={100}, so dash units are percentages of
+   the path regardless of its real geometry. One keyframe fits all of them. */
+@keyframes packet-travel {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.packet {
+  stroke-dasharray: 7 999;
+  stroke-dashoffset: 0;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .packet[data-packet="on"] {
+    opacity: 1;
+    animation: packet-travel 520ms var(--ease-trace) 1 forwards;
+  }
+}
+
+/* Reduced motion: the packet is skipped entirely. The hover state is still
+   communicated by the copper highlight on the trace, so no information is
+   carried by motion alone. */
+
+/* ============================================================================
+   TRACE BUS FILL — §2.1
+
+   The copper fill sweeps to the active pad. Under reduced motion it snaps to
+   the correct position instead, which still conveys scroll position.
+   ========================================================================== */
+
+.trace-progress {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trace-progress {
+    transition: stroke-dashoffset 420ms var(--ease-trace);
+  }
+}
