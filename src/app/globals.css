@@ -295,3 +295,35 @@ summary::-webkit-details-marker {
     transition: none;
   }
 }
+
+/* ============================================================================
+   LIVE SIGNAL
+
+   The pulse marks the newest flagged point. It runs once per flag — roughly
+   every twenty seconds — and never loops, so it stays inside the
+   hover/focus-triggered spirit of §2.3 rather than becoming ambient motion.
+
+   `transform-box: fill-box` makes transform-origin resolve against the
+   circle's own bounding box instead of the SVG's user-space origin, which is
+   what lets it scale from its own centre. Animating transform rather than the
+   `r` attribute keeps it on the compositor.
+   ========================================================================== */
+
+@keyframes signal-pulse {
+  from {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .signal-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: signal-pulse 900ms var(--ease-trace) 1 forwards;
+  }
+}

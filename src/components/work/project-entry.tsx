@@ -1,6 +1,8 @@
 import Image from "next/image";
 import type { Project, ProjectLink } from "@/data/projects";
 import { PipelineDiagram } from "@/components/visuals/pipeline";
+import { TerminalBlock } from "@/components/visuals/terminal";
+import { LiveSignal } from "@/components/visuals/live-signal";
 import { Fade } from "@/components/motion/reveal";
 
 function ArrowOut() {
@@ -60,6 +62,7 @@ export function ProjectEntry({ project }: { project: Project }) {
     links,
     image,
     visual,
+    liveSignal,
     team,
   } = project;
 
@@ -112,6 +115,8 @@ export function ProjectEntry({ project }: { project: Project }) {
         </div>
       )}
       {visual === "pipeline" && <PipelineDiagram />}
+      {visual === "terminal" && <TerminalBlock />}
+      {liveSignal && <LiveSignal />}
 
       <dl className="mt-8 max-w-prose space-y-4">
         {(

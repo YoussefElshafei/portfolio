@@ -43,7 +43,9 @@ export type Project = {
   links: readonly ProjectLink[];
   image?: ProjectImage;
   /** An abstract visual built from the project's own concept, not a stock image. */
-  visual?: "pipeline";
+  visual?: "pipeline" | "terminal";
+  /** Renders the Live Signal widget beneath the visual. TradeWatch only. */
+  liveSignal?: true;
   /** Rendered plainly where the work was not solo. */
   team?: string;
   node: { x: number; y: number };
@@ -103,6 +105,7 @@ export const PROJECTS: readonly Project[] = [
       },
     ],
     visual: "pipeline",
+    liveSignal: true,
     node: { x: 340, y: 120 },
   },
 
@@ -229,12 +232,7 @@ export const PROJECTS: readonly Project[] = [
         a11yLabel: "WireFish on GitHub",
       },
     ],
-    image: {
-      src: "/images/wirefish-1.webp",
-      width: 800,
-      height: 800,
-      alt: "WireFish network diagnostics toolkit.",
-    },
+    visual: "terminal",
     team: "Built collaboratively in a Git-based team workflow with 3 teammates.",
     node: { x: 120, y: 70 },
   },

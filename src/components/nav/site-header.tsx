@@ -2,6 +2,7 @@
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { MobileNav } from "@/components/nav/mobile-nav";
+import { CommandPalette } from "@/components/nav/command-palette";
 import { useNavState } from "@/lib/nav-state";
 import { SECTIONS } from "@/lib/sections";
 import { SITE } from "@/config/site";
@@ -59,6 +60,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
+          <CommandPalette />
           <ThemeToggle />
           <MobileNav />
         </div>

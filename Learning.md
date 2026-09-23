@@ -1251,3 +1251,207 @@ before changing the thing being measured.**
 as an editorial decision, `naturalWidth` under `srcset` density.
 
 **Status:** 26/26 assertions, clean build, clean lint, Prettier clean.
+
+### 2026-09-22 — Stage 6: replacing the generated logo
+
+**Asked for:** build the WireFish terminal block and remove the AI-generated logo.
+
+**Why it mattered.** The WireFish image was generated key art — a glowing neon-blue fish on
+a dark circuit background. It was the single thing on the site that looked machine-made, and
+it sat on the anti-pattern list twice over: neon-on-dark with glows (§1b) and decoration with
+no relationship to the work (§1 item 11). It was also a *logo*, not evidence — it showed
+that someone had made a logo, not that the tool existed.
+
+**Done:**
+- Built `visuals/terminal.tsx`: the three real CLI invocations with a copper prompt, each
+  annotated with one sourced line, under a header strip carrying the three output modes.
+- Deleted `public/images/wirefish-1.webp`.
+
+**The important restraint: it is a synopsis, not a simulated session.** Rendering fake scan
+results — invented hosts, invented hop latencies, invented bitrates — would have looked far
+more impressive and would have been fabricated evidence. That is the exact failure the rest
+of the site is organised against, and TradeWatch's own rule ("no performance number appears
+unless a benchmark produced it") would have been violated by its neighbour. Real commands,
+no invented output.
+
+**Real text beats a screenshot here** for reasons worth being able to list: it is
+selectable, searchable, readable by a screen reader, sharp at any zoom and in any theme, it
+costs a few hundred bytes instead of ~50 KB, and it recolours correctly in light mode
+instead of being a dark rectangle pasted onto a pale page.
+
+#### Two CSS line-breaking details
+
+1. **`whitespace-pre` scrolls; `whitespace-pre-wrap` wraps.** The first version scrolled
+   horizontally inside the block, which at 375px clipped `--interval 100` with nothing to
+   signal there was more to the right. A real terminal wraps, so the block wraps.
+2. **A hyphen is a soft wrap opportunity.** Once wrapping was on, `--interval` broke across
+   two lines as `--` and `interval`, which reads like a different flag. There is no clean
+   CSS property to forbid that, so each token is wrapped in `whitespace-nowrap` and the
+   spaces between them carry the breaks. Flags stay atomic; lines break where a terminal
+   would break them.
+
+**Status:** 26/26 assertions, clean build, clean lint, Prettier clean. Two images remain on
+the site, both real artefacts: a product screenshot and a CAD drawing.
+
+## Part 2c — Concepts added with the Live Signal
+
+### 2.16 Rolling statistics, and the bias that hides outliers
+
+The Live Signal widget on the TradeWatch entry runs a genuine rolling z-score
+detector. `src/lib/signal.ts` is pure, React-free and unit-tested, because the
+whole point is that someone who opens it finds real logic.
+
+**The detector.** Keep a window of the last N points, compute their mean and
+standard deviation, and score each new point as `z = (x - mean) / sd`. Flag when
+`|z| > 2.5`.
+
+**The subtle part: a point must not be in its own baseline.** If the point being
+judged is included in the window used to judge it, it drags the mean toward
+itself and inflates the standard deviation, which shrinks its own score — the
+bigger the outlier, the better it hides. Measured in the test suite: a true
+4.00σ spike scores **3.18σ** if it is allowed into its own baseline. So the
+baseline is always the window of points *preceding* the one under test.
+
+**Sample, not population, standard deviation.** The `n-1` denominator (Bessel's
+correction) is right here because the window is a sample of an ongoing process,
+not the entire population. With n=30 the difference is about 1.7%, which is
+enough to move a borderline point across a 2.5 threshold.
+
+**Why recompute the whole window instead of updating incrementally.** There is a
+well-known trick for maintaining a running variance by adding the new term and
+subtracting the old one. It is faster and it is a trap: repeatedly adding and
+subtracting floating-point terms accumulates error, and the running sum of
+squares can drift *negative*, at which point `Math.sqrt` returns `NaN` and every
+downstream z-score is silently broken. At a window of 30, recomputation is
+thirty additions — free — so correctness wins. Knowing why you did not use the
+clever version is worth more than using it.
+
+**Guarding the degenerate case.** A perfectly flat window has sd 0, which makes
+every z-score infinite. `zScore` returns 0 when the spread is below 1e-9, so a
+flat baseline does not flag every subsequent point forever.
+
+**Honesty about the data.** The series is synthetic: a mean-reverting
+(Ornstein–Uhlenbeck) random walk with occasional volatility shocks, so the
+widget demonstrates something within about twenty seconds rather than twenty
+minutes. Real price series have fat tails, so shocks are a fair approximation
+rather than a cheat. The important line is that **the detector knows nothing
+about where the shocks are** — it sees only the series. It misses shocks that
+land inside normal variance and flags ordinary points that sit far from the
+local mean. That is what this class of detector actually does, and it is not
+corrected for.
+
+### 2.17 Making a live widget behave
+
+Three things separate a ticking widget from a battery drain:
+
+**Determinism and SSR.** The series is seeded (`mulberry32`), so the first 102
+points are computed at module scope and are byte-identical on the server and in
+the browser. No hydration mismatch, no flash of an empty chart, and every
+visitor sees the same opening frame. The running stream is then fast-forwarded
+past that prefix so ticking continues seamlessly. This is the same reasoning as
+the project graph's committed coordinates (2.10).
+
+**Pausing on `visibilitychange`.** A backgrounded tab should not be running a
+timer, recomputing statistics and queueing React renders nobody will see.
+Browsers throttle background timers but do not stop them, so this is on the
+page to handle. Verified by faking `document.hidden` and asserting the readouts
+stop changing.
+
+**Reduced motion slows rather than stops.** Elsewhere on this site
+`prefers-reduced-motion` disables animation outright, because the animation is
+decoration. Here the numbers *are* the content, so freezing them would remove
+the point of the widget. The tick slows from 1s to 4s and the pulse is dropped.
+The distinction worth carrying: reduce motion, not information.
+
+**Timestamps are the series' own clock.** The flag line reads `t+0066`, not a
+wall-clock time. A clock would imply this synthetic stream is tied to real
+market hours, and it cannot be server-rendered without a hydration mismatch.
+
+One bug found by looking rather than testing: the caption said "Nothing outside
+2.5σ yet" while two flagged points were plainly visible on the chart. The flags
+were in the primed prefix, before ticking began, so the caption state was still
+null. It now initialises from the last flag in the prefix, so the text and the
+chart agree from the first paint.
+
+### 2.18 A command palette as a combobox
+
+Cmd/Ctrl+K opens a palette that jumps to any section, or to a project by name
+**or by a technology it uses** — typing "kafka" surfaces TradeWatch. That last
+part is what makes it more than a second menu: it is the only way to search the
+work by stack.
+
+The accessible pattern is a **combobox over a listbox**, and the key detail is
+that focus never leaves the input. Arrow keys move `aria-activedescendant`,
+which points at the id of the highlighted option, rather than moving DOM focus
+into the list. Moving real focus would strand a screen reader on an element the
+combobox no longer owns and break the relationship between the input and the
+results. The rest is the standard dialog contract already used by the mobile
+sheet (2.7): `role="dialog"`, `aria-modal`, a focus trap, Escape to close,
+scroll lock, and focus returned to whatever opened it.
+
+After selecting, focus moves to the destination section rather than back to the
+trigger, so a keyboard user carries on reading from where they navigated to.
+
+**A lint rule worth knowing.** The first version tracked group headings by
+reassigning a variable while mapping during render:
+
+```tsx
+let lastGroup = null;
+results.map((c) => { const show = c.group !== lastGroup; lastGroup = c.group; ... })
+```
+
+`react-hooks/immutability` rejects this: *"Cannot reassign variable after render
+completes."* Reassigning across a render pass assumes the list renders exactly
+once, in order, start to finish — which React does not promise. The grouping is
+now computed in the `useMemo` that produces the results, as data.
+
+### 2.19 Tests can break each other
+
+The regression suite went from 26/26 to 24/26 after adding a check that every
+mention of "fraud" or "manipulation" on the page is a disclaimer. Neither
+failure was a bug in the site:
+
+1. The new check was written by stripping two known disclaimer sentences before
+   searching — so it broke the moment the copy was reworded. It now looks for a
+   negation near each match instead, which survives rephrasing.
+2. To read copy inside collapsed `<details>`, the check force-opened every
+   disclosure on the page — and left them open, so a later assertion that
+   disclosures are *collapsed by default* failed. Shared page state between
+   assertions is the test-suite equivalent of a global variable.
+
+The habit: when a test starts failing right after you add a different test,
+suspect the new test before the code.
+
+### 2026-09-22 — Stage 7: Live Signal and command palette
+
+**Asked for:** one memorable feature demonstrating real logic tied to TradeWatch —
+explicitly *not* a terminal boot sequence, since two of the three reference
+portfolios already open with one — plus a Cmd/Ctrl+K command palette.
+
+**Done:**
+- `src/lib/signal.ts` — seeded PRNG, Box–Muller gaussian, Ornstein–Uhlenbeck
+  series with shocks, rolling mean/sd, z-score classification. Pure, no React.
+- `src/lib/signal.test.ts` — 16 tests under Node's built-in runner (`npm test`),
+  covering the hand-checked dataset, the sample-vs-population denominator, the
+  flat-baseline guard, the self-exclusion bias, determinism, and that the flag
+  rate stays in a band that reads as a real threshold.
+- `visuals/live-signal.tsx` — the chart, the dashed rolling-mean baseline, copper
+  flags with a one-shot pulse, mono readouts and a caption linking to TradeWatch.
+- `nav/command-palette.tsx` — combobox/listbox, section and project search
+  including stack tags, with a `⌘K` trigger in the header for discoverability.
+- `allowImportingTsExtensions` in tsconfig so the test file's `./signal.ts`
+  import satisfies both Node's ESM resolver and the Next build.
+
+**Verification:** 16/16 unit, 25/25 new-feature browser assertions, 26/26
+regression. The feature suite checks the statistics as rendered, not just that
+pixels appeared: it reads `value`, `mean`, `σ` and `z` off the DOM and asserts
+`z === (value - mean) / σ` to within 0.02. It also fakes `document.hidden` to
+prove the stream pauses, and waits up to 60s for a real flag and then asserts
+the reported deviation actually exceeds 2.5.
+
+**Concepts introduced:** rolling-statistics correctness and self-exclusion bias
+(2.16), determinism/SSR/visibility/reduced-motion for live widgets (2.17), the
+combobox pattern and the React Compiler immutability rule (2.18), test
+cross-contamination (2.19).
+
+**Status:** clean build, ESLint 0, Prettier clean, all three suites green.
