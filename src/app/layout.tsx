@@ -6,7 +6,7 @@ import { ThemeScript } from "@/components/theme/theme-script";
 import { SiteHeader } from "@/components/nav/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TraceBus } from "@/components/nav/trace-bus";
-import { NavStateProvider } from "@/lib/nav-state";
+import { NavStateProvider, NAV_END_ID } from "@/lib/nav-state";
 import { SITE } from "@/config/site";
 
 /* Two typefaces, exactly (DESIGN_BRIEF.md §3.1). Self-hosted by next/font, so
@@ -27,8 +27,17 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: SITE.name,
+  title: {
+    default: `${SITE.name} — ${SITE.role}`,
+    template: `%s — ${SITE.name}`,
+  },
   description: SITE.description,
+  openGraph: {
+    title: `${SITE.name} — ${SITE.role}`,
+    description: SITE.description,
+    type: "profile",
+    locale: "en_CA",
+  },
 };
 
 export const viewport: Viewport = {
@@ -73,6 +82,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <div className="mx-auto max-w-wide px-5 sm:px-8">{children}</div>
             </main>
             <SiteFooter />
+            {/* Marks the end of the document for the nav-state observer, so
+                the last section can still be marked current once the page has
+                scrolled as far as it goes. */}
+            <div id={NAV_END_ID} aria-hidden="true" className="h-px" />
           </div>
         </NavStateProvider>
       </body>

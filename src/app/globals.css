@@ -114,9 +114,15 @@
   --ease-*: initial;
   --ease-trace: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Two container widths only. §3.3 */
+  /* Two container widths only. §3.3
+     ...plus one documented exception, which §3.3 allows so long as the reason
+     is written down. Project screenshots are up to 1908px wide; rendered at
+     the 68ch prose measure their UI text is too small to read, which defeats
+     the point of showing real software. Figures get their own width, still
+     narrower than `wide` so they stay subordinate to the text column. */
   --container-*: initial;
   --container-prose: 68ch;
+  --container-figure: 52rem;
   --container-wide: 1120px;
 
   /* Left gutter reserved for the trace bus. §2.1 Wide enough to hold the
@@ -265,5 +271,27 @@ h4 {
 @media (prefers-reduced-motion: no-preference) {
   .trace-progress {
     transition: stroke-dashoffset 420ms var(--ease-trace);
+  }
+}
+
+/* ============================================================================
+   DISCLOSURE
+
+   Native <details> for the project implementation bullets: keyboard accessible
+   and functional with JavaScript disabled, with no state to manage. Only the
+   default marker is replaced, so the semantics stay untouched.
+   ========================================================================== */
+
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-open\:rotate-90 {
+    transition: none;
   }
 }

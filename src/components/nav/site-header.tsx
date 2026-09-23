@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { useNavState } from "@/lib/nav-state";
 import { SECTIONS } from "@/lib/sections";
+import { SITE } from "@/config/site";
 
 /**
  * Site header.
@@ -27,14 +28,13 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-wide items-center gap-6 px-5 sm:px-8">
         <a
           href="#top"
-          className="shrink-0 text-h3 font-semibold tracking-tight text-silk"
+          className="shrink-0 font-semibold tracking-tight text-silk"
         >
-          {/* Replaced with the real name at the content stage. */}
-          Portfolio
+          {SITE.name}
         </a>
 
-        <nav aria-label="Sections" className="ml-auto hidden md:block">
-          <ul className="flex items-center gap-1">
+        <nav aria-label="Sections" className="ml-auto hidden lg:block">
+          <ul className="flex items-center gap-0.5">
             {SECTIONS.map((section) => {
               const isActive = section.id === activeId;
               return (
@@ -58,7 +58,7 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="ml-auto flex items-center gap-2 lg:ml-0">
           <ThemeToggle />
           <MobileNav />
         </div>

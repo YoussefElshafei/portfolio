@@ -1,30 +1,22 @@
 /**
  * Graph dataset — DESIGN_BRIEF.md §2.2
  *
- * Coordinates are authored by hand in viewBox pixels and committed. There is no
- * force simulation and no layout pass at runtime, so the diagram is byte-identical
- * on every visit. That is what makes it read as a schematic rather than a toy.
+ * Nodes are projects. Edges join projects that share part of a stack.
  *
- * Edges are derived once from shared tags and written down here rather than
- * recomputed on every render, for the same reason.
+ * Coordinates live on each project in `projects.ts`, authored by hand and
+ * committed. There is no force simulation and no layout pass at runtime, so the
+ * diagram is identical on every visit — a schematic rather than a screensaver.
  *
- * SCAFFOLD NOTE
- * -------------
- * Real projects do not exist yet, and DESIGN_BRIEF.md §1 forbids shipping
- * placeholder content. Rather than invent fake project names, the specimen
- * dataset below is *true*: it is this repository's own module graph, where a
- * tag is the layer a module belongs to. Same shape, same component, no fiction.
- *
- * At the content stage, replace NODES and EDGES with the real projects. Nothing
- * in project-graph.tsx needs to change.
+ * Edges are derived from the real stack lists rather than maintained by hand,
+ * so they cannot fall out of step with the project content. The derivation runs
+ * once at module scope and is deterministic: same input, same output, every time.
  */
+
+import { PROJECTS, type Project } from "@/data/projects";
 
 export type GraphNode = {
   id: string;
   label: string;
-  /** Shared tags are what produce edges. For projects this is the stack. */
-  tags: readonly string[];
-  /** viewBox pixel coordinates. Precomputed, committed, never randomised. */
   x: number;
   y: number;
 };
@@ -32,67 +24,72 @@ export type GraphNode = {
 export type GraphEdge = {
   from: string;
   to: string;
-  /** The tag the two nodes have in common. Shown in the legend. */
-  via: string;
+  /** Every technology the two projects have in common. */
+  via: readonly string[];
 };
 
 export const GRAPH_VIEWBOX = { width: 820, height: 420 } as const;
 
-export const NODES: readonly GraphNode[] = [
-  { id: "tokens", label: "tokens", tags: ["theme"], x: 64, y: 210 },
-  { id: "theme-script", label: "theme-script", tags: ["theme"], x: 196, y: 86 },
-  { id: "nav-state", label: "nav-state", tags: ["nav"], x: 196, y: 320 },
-  {
-    id: "theme-toggle",
-    label: "theme-toggle",
-    tags: ["theme", "ui"],
-    x: 352,
-    y: 120,
-  },
-  { id: "trace-bus", label: "trace-bus", tags: ["nav", "svg"], x: 352, y: 262 },
-  {
-    id: "project-graph",
-    label: "project-graph",
-    tags: ["svg"],
-    x: 352,
-    y: 380,
-  },
-  {
-    id: "site-header",
-    label: "site-header",
-    tags: ["nav", "ui"],
-    x: 528,
-    y: 162,
-  },
-  {
-    id: "mobile-nav",
-    label: "mobile-nav",
-    tags: ["nav", "ui"],
-    x: 528,
-    y: 300,
-  },
-  { id: "site-footer", label: "site-footer", tags: ["ui"], x: 656, y: 228 },
-];
+/**
+ * "Python (visualizer)" and "Python" are the same technology for the purpose of
+ * drawing an edge. Lowercase and drop any parenthetical qualifier.
+ */
+const normalise = (tag: string) =>
+  tag
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, "")
+    .trim();
 
-export const EDGES: readonly GraphEdge[] = [
-  { from: "tokens", to: "theme-script", via: "theme" },
-  { from: "tokens", to: "theme-toggle", via: "theme" },
-  { from: "theme-script", to: "theme-toggle", via: "theme" },
-  { from: "nav-state", to: "trace-bus", via: "nav" },
-  { from: "nav-state", to: "site-header", via: "nav" },
-  { from: "nav-state", to: "mobile-nav", via: "nav" },
-  { from: "trace-bus", to: "site-header", via: "nav" },
-  { from: "trace-bus", to: "project-graph", via: "svg" },
-  { from: "site-header", to: "mobile-nav", via: "nav" },
-  { from: "theme-toggle", to: "site-header", via: "ui" },
-  { from: "theme-toggle", to: "site-footer", via: "ui" },
-  { from: "site-header", to: "site-footer", via: "ui" },
-  { from: "mobile-nav", to: "site-footer", via: "ui" },
-];
+export const NODES: readonly GraphNode[] = PROJECTS.map((p: Project) => ({
+  id: p.id,
+  label: p.name,
+  x: p.node.x,
+  y: p.node.y,
+}));
 
-export const TAGS = ["theme", "nav", "ui", "svg"] as const;
+/** normalised tag -> the projects using it, in declaration order. */
+const BY_TAG: ReadonlyMap<string, readonly string[]> = (() => {
+  const map = new Map<string, string[]>();
+  for (const p of PROJECTS) {
+    for (const tag of p.stack) {
+      const key = normalise(tag);
+      const list = map.get(key);
+      if (list) list.push(p.id);
+      else map.set(key, [p.id]);
+    }
+  }
+  return map;
+})();
 
-/** Adjacency, built once at module scope rather than per render. */
+/**
+ * Only a technology that more than one project uses can produce an edge, so
+ * those are also exactly the tags worth offering as a filter.
+ */
+export const SHARED_TAGS: readonly string[] = [...BY_TAG.entries()]
+  .filter(([, ids]) => ids.length > 1)
+  .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+  .map(([tag]) => tag);
+
+export const EDGES: readonly GraphEdge[] = (() => {
+  const pairs = new Map<string, string[]>();
+  for (const tag of SHARED_TAGS) {
+    const ids = BY_TAG.get(tag) ?? [];
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const key = `${ids[i]}|${ids[j]}`;
+        const existing = pairs.get(key);
+        if (existing) existing.push(tag);
+        else pairs.set(key, [tag]);
+      }
+    }
+  }
+  return [...pairs.entries()].map(([key, via]) => {
+    const [from, to] = key.split("|");
+    return { from, to, via };
+  });
+})();
+
+/** Adjacency, built once rather than per render. */
 export const NEIGHBOURS: ReadonlyMap<string, ReadonlySet<string>> = (() => {
   const map = new Map<string, Set<string>>();
   for (const n of NODES) map.set(n.id, new Set());
@@ -102,6 +99,11 @@ export const NEIGHBOURS: ReadonlyMap<string, ReadonlySet<string>> = (() => {
   }
   return map;
 })();
+
+/** Which projects carry a given normalised tag. Used by the legend filter. */
+export function projectsWithTag(tag: string): readonly string[] {
+  return BY_TAG.get(tag) ?? [];
+}
 
 export const NODE_BY_ID: ReadonlyMap<string, GraphNode> = new Map(
   NODES.map((n) => [n.id, n]),

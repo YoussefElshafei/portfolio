@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -29,47 +28,79 @@ type NavState = {
 
 const NavContext = createContext<NavState | null>(null);
 
+/** Sentinel at the very end of the document. See `atEnd` below. */
+export const NAV_END_ID = "nav-end";
+
 export function NavStateProvider({ children }: { children: ReactNode }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [observedId, setObservedId] = useState<string | null>(null);
+  const [atEnd, setAtEnd] = useState(false);
   const [cursorId, setCursorId] = useState<string | null>(null);
 
-  // IntersectionObserver rather than a scroll handler: the callback fires only
-  // when a section crosses the band, not on every scroll frame. Keeps the bus
-  // free under CPU throttling (§2 perf cap).
-  const ratios = useRef(new Map<string, number>());
+  /*
+   * The final section can never win the band test: once the page has scrolled
+   * as far as it goes, Contact sits below the detection band and the section
+   * above it keeps the highlight. Clicking "Contact" in the nav then failed to
+   * mark Contact as current.
+   *
+   * Rather than add a scroll listener, a 1px sentinel at the end of the
+   * document is observed by a second IntersectionObserver. If it is on screen,
+   * the reader is at the bottom and the last section is the current one.
+   */
+  useEffect(() => {
+    const sentinel = document.getElementById(NAV_END_ID);
+    if (!sentinel) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setAtEnd(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, []);
 
+  const lastId = SECTIONS[SECTIONS.length - 1]?.id ?? null;
+  const activeId = atEnd ? lastId : observedId;
+
+  /*
+   * Which section is "current" is decided by a reading line near the top of the
+   * viewport: the current section is the last one whose top edge has crossed
+   * it. Before the first section reaches the line — while the hero is on
+   * screen — nothing is current, which is correct.
+   *
+   * The obvious alternative, picking the section with the largest
+   * `intersectionRatio`, is wrong here and was the original implementation.
+   * Ratio is measured against the element's own height, so Projects — seven
+   * thousand pixels tall — scores near zero however much of the screen it
+   * fills, and a short section above it keeps the highlight while the reader
+   * is plainly inside Projects.
+   *
+   * An IntersectionObserver still drives this rather than a scroll listener:
+   * the callback fires only when a section edge crosses the viewport, not on
+   * every scroll frame, so nothing runs during the scroll itself. Reading six
+   * rects inside that callback is negligible and happens a handful of times
+   * per page, not sixty times a second.
+   */
   useEffect(() => {
     const els = SECTIONS.map((s) => document.getElementById(s.id)).filter(
       (el): el is HTMLElement => el !== null,
     );
     if (els.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          ratios.current.set(entry.target.id, entry.intersectionRatio);
-        }
-        let best: string | null = null;
-        let bestRatio = 0;
-        for (const s of SECTIONS) {
-          const r = ratios.current.get(s.id) ?? 0;
-          if (r > bestRatio) {
-            bestRatio = r;
-            best = s.id;
-          }
-        }
-        // Keep the last active section rather than flicking to null in the gap
-        // between two sections.
-        if (best) setActiveId(best);
-      },
-      {
-        // Weight the middle band of the viewport.
-        rootMargin: "-20% 0px -35% 0px",
-        threshold: [0, 0.2, 0.5, 0.8, 1],
-      },
-    );
+    const pick = () => {
+      const line = window.innerHeight * 0.3;
+      let best: string | null = null;
+      for (const s of SECTIONS) {
+        const el = document.getElementById(s.id);
+        if (el && el.getBoundingClientRect().top <= line) best = s.id;
+      }
+      setObservedId(best);
+    };
+
+    const observer = new IntersectionObserver(pick, {
+      threshold: [0, 1],
+    });
 
     els.forEach((el) => observer.observe(el));
+    pick();
     return () => observer.disconnect();
   }, []);
 

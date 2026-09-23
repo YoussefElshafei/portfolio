@@ -1,25 +1,18 @@
 /**
- * Site configuration.
- *
- * The one file to edit at the content stage.
- *
- * The contact values are intentionally EMPTY rather than filled with a
- * plausible-looking guess. An empty value renders the footer icon in a visibly
- * inactive state instead of a link that goes nowhere, which keeps the build
- * honest: DESIGN_BRIEF.md §1 forbids a resume button that 404s or a contact
- * affordance that silently does nothing, and a `href="#"` is the same sin.
+ * Site configuration. The one file to edit for identity and contact.
  */
 export const SITE = {
-  /** Replace with the real name. Used in the header and in metadata. */
-  name: "Portfolio",
-  /** One line, no buzzwords. See DESIGN_BRIEF.md §1 item 9. */
-  description: "Design system scaffold. Content pending.",
-  /** Canonical origin, for metadata and the OG image. */
+  name: "Youssef Elshafei",
+  role: "Software Engineering & Business Management Student",
+  location: "Hamilton, ON",
+  school: "McMaster University",
+  description:
+    "Software engineering and business management student at McMaster University. Projects in market data infrastructure, disaster response, network diagnostics and embedded control.",
   url: "https://example.com",
 } as const;
 
 export const CONTACT = {
-  github: "",
-  linkedin: "",
-  email: "",
+  github: "https://github.com/YoussefElshafei",
+  linkedin: "https://www.linkedin.com/in/youssef-elshafei/",
+  email: "yelshafe2006@gmail.com",
 } as const;

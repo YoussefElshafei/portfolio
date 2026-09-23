@@ -84,14 +84,14 @@ export function MobileNav() {
         aria-label="Open navigation"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk md:hidden"
+        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk lg:hidden"
       >
         <Menu aria-hidden="true" className="size-4" strokeWidth={1.75} />
       </button>
 
       <AnimatePresence>
         {open && (
-          <div className="fixed inset-0 z-50 md:hidden">
+          <div className="fixed inset-0 z-50 lg:hidden">
             <motion.div
               className="absolute inset-0 bg-substrate/85"
               initial={{ opacity: 0 }}
