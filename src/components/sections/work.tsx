@@ -8,17 +8,16 @@ import { PROJECTS } from "@/data/projects";
  * Projects.
  *
  * The graph is the index: it shows the shape of the work — what shares a stack
- * with what — in a way a vertical list of cards cannot. The entries below are
+ * or a teammate with what — in a way a vertical list of cards cannot. The entries below are
  * the detail, and the graph's nodes link straight to them.
  */
 export function Work() {
   return (
     <Section id="work" ref_="02" title="Projects" className="pb-28">
-      <Fade className="mb-10 max-w-prose text-silk-dim">
+      <Fade className="mb-10 max-w-column text-silk-dim">
         <p>
-          Six projects. Each one leads with the problem it had to solve and the
-          constraint that made it awkward, because that is the part worth
-          reading. Nodes in the diagram link to the entry below.
+          Five projects, each with a short account of what it does and what made
+          it interesting to build. Nodes in the diagram link to the entry below.
         </p>
       </Fade>
 

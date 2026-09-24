@@ -9,7 +9,7 @@ import type { SVGProps } from "react";
  * are solid, so they read as one set — unlike mixing a solid brand mark with a
  * stroked UI icon.
  *
- * Stroked lucide icons are still used for UI affordances (menu, close, theme).
+ * Stroked lucide icons are still used for UI affordances (menu, close).
  * Brand marks and controls are different categories and are drawn differently
  * on purpose.
  */

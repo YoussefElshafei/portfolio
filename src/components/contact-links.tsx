@@ -42,14 +42,15 @@ const BOX =
   "inline-flex size-9 items-center justify-center rounded-trace border border-hairline";
 
 /**
- * The three contact links, used in both the contact section and the footer.
+ * The three contact links, used in the header, the contact section and the
+ * footer. One component, so the copies cannot drift apart.
  *
  * A link with no URL renders inert rather than as `href="#"` and drops out of
  * the tab order, so nothing on the page offers something it cannot do.
  */
-export function ContactLinks() {
+export function ContactLinks({ className = "" }: { className?: string }) {
   return (
-    <ul className="flex items-center gap-2">
+    <ul className={`flex items-center gap-2 ${className}`}>
       {LINKS.map(({ key, label, href, external, Icon }) => (
         <li key={key}>
           {href ? (

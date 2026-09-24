@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Search } from "lucide-react";
 import { SECTIONS } from "@/lib/sections";
 import { PROJECTS } from "@/data/projects";
 
@@ -80,25 +81,37 @@ export function CommandPalette() {
   const [active, setActive] = useState(0);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
   const listboxId = useId();
   const titleId = useId();
 
+  /** Flat, in selection order. `active` indexes into this. */
+  const results = useMemo(() => filter(query), [query]);
+
   /**
-   * Group headings are decided here rather than by mutating a tracker variable
-   * while mapping during render. Reassigning across a render pass is exactly
-   * what the React Compiler's immutability rule catches, and it would break if
-   * the list ever rendered out of order or partially.
+   * The same results arranged as real groups.
+   *
+   * Two shapes are needed: a flat list, because keyboard selection is a single
+   * index across everything, and a grouped one, because a listbox's headings
+   * have to label an actual `role="group"` containing all of that group's
+   * options — not just sit above the first of them. Each item carries its flat
+   * index so the two never drift apart.
    */
-  const results = useMemo(() => {
-    const list = filter(query);
-    return list.map((command, i) => ({
-      command,
-      showGroup: i === 0 || list[i - 1].group !== command.group,
-    }));
-  }, [query]);
+  const grouped = useMemo(() => {
+    const out: {
+      group: Command["group"];
+      items: { command: Command; index: number }[];
+    }[] = [];
+    results.forEach((command, index) => {
+      const last = out[out.length - 1];
+      if (last && last.group === command.group)
+        last.items.push({ command, index });
+      else out.push({ group: command.group, items: [{ command, index }] });
+    });
+    return out;
+  }, [results]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -148,21 +161,14 @@ export function CommandPalette() {
 
     inputRef.current?.focus();
 
+    // The input is the only focusable element in the panel: options are
+    // `role="option"` divs selected through aria-activedescendant, never tab
+    // stops. So the trap is simply to swallow Tab and keep focus where the
+    // combobox expects it, rather than cycling through a list of one.
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
-      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
-        "input, [data-command]",
-      );
-      if (!focusables?.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      e.preventDefault();
+      inputRef.current?.focus();
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -203,8 +209,8 @@ export function CommandPalette() {
       setActive(Math.max(0, results.length - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const entry = results[active];
-      if (entry) run(entry.command);
+      const command = results[active];
+      if (command) run(command);
     }
   };
 
@@ -215,10 +221,26 @@ export function CommandPalette() {
         onClick={openPalette}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="hidden items-center gap-2 rounded-trace border border-hairline px-2.5 py-1.5 font-mono text-micro text-silk-faint hover:border-edge hover:text-silk lg:inline-flex"
+        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-faint hover:border-edge hover:text-silk lg:size-auto lg:px-2.5 lg:py-1.5"
       >
-        <span aria-hidden="true">⌘K</span>
-        <span className="sr-only">Open command palette</span>
+        {/*
+          A magnifier below `lg`, the shortcut above it. The shortcut hint is
+          useless on a phone — there is no Cmd key — and hiding the trigger
+          entirely made the palette unreachable without a keyboard, which meant
+          touch users had no way to search projects by stack at all.
+        */}
+        <Search
+          aria-hidden="true"
+          className="size-4 lg:hidden"
+          strokeWidth={1.75}
+        />
+        <span
+          aria-hidden="true"
+          className="hidden font-mono text-micro lg:inline"
+        >
+          ⌘K
+        </span>
+        <span className="sr-only">Search sections and projects</span>
       </button>
 
       {open && (
@@ -233,7 +255,7 @@ export function CommandPalette() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="absolute inset-x-4 top-[12vh] mx-auto max-w-prose overflow-hidden rounded-trace border border-edge bg-surface sm:inset-x-8"
+            className="absolute inset-x-4 top-[12vh] mx-auto max-w-column overflow-hidden rounded-trace border border-edge bg-surface sm:inset-x-8"
           >
             <h2 id={titleId} className="sr-only">
               Search sections and projects
@@ -254,9 +276,7 @@ export function CommandPalette() {
                 aria-controls={listboxId}
                 aria-autocomplete="list"
                 aria-activedescendant={
-                  results[active]
-                    ? `cmd-${results[active].command.id}`
-                    : undefined
+                  results[active] ? `cmd-${results[active].id}` : undefined
                 }
                 placeholder="Jump to a section, or a project by name or stack"
                 value={query}
@@ -269,7 +289,21 @@ export function CommandPalette() {
               />
             </div>
 
-            <ul
+            {/*
+              A listbox may only contain `option` and `group` children. The
+              first version used <ul>/<li> with <button role="option"> inside
+              each <li>, which produced three critical axe violations at once:
+              the options were not direct children of the listbox, the <li>
+              wrappers were orphaned once the <ul> took a non-list role, and the
+              group headings sat inside the list rather than labelling a group.
+
+              Options are divs rather than buttons on purpose. In a combobox the
+              options are never individually focusable — focus stays in the
+              input and `aria-activedescendant` points at the active one — so a
+              <button> here would be both the wrong role and a tab stop that
+              should not exist.
+            */}
+            <div
               ref={listRef}
               id={listboxId}
               role="listbox"
@@ -277,50 +311,51 @@ export function CommandPalette() {
               className="max-h-[50vh] overflow-y-auto py-2"
             >
               {results.length === 0 && (
-                <li className="px-4 py-3 text-micro text-silk-faint">
+                <p className="px-4 py-3 text-micro text-silk-faint">
                   No match for{" "}
                   <span className="font-mono text-silk-dim">{query}</span>
-                </li>
+                </p>
               )}
 
-              {results.map(({ command, showGroup }, i) => {
-                const isActive = i === active;
-                const hint = matchReason(command, query);
-
-                return (
-                  <li key={command.id}>
-                    {showGroup && (
-                      <p className="px-4 pt-3 pb-1 text-micro text-silk-faint">
-                        {command.group}
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      id={`cmd-${command.id}`}
-                      data-command
-                      data-active={isActive}
-                      role="option"
-                      aria-selected={isActive}
-                      tabIndex={-1}
-                      onMouseMove={() => setActive(i)}
-                      onClick={() => run(command)}
-                      className={`flex w-full items-baseline justify-between gap-4 px-4 py-2 text-left ${
-                        isActive
-                          ? "bg-copper-wash text-copper"
-                          : "text-silk hover:text-copper"
-                      }`}
-                    >
-                      <span>{command.label}</span>
-                      {hint && (
-                        <span className="shrink-0 font-mono text-micro text-silk-faint">
-                          {hint}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+              {grouped.map(({ group, items }) => (
+                <div key={group} role="group" aria-label={group}>
+                  <p
+                    aria-hidden="true"
+                    className="px-4 pt-3 pb-1 text-micro text-silk-faint"
+                  >
+                    {group}
+                  </p>
+                  {items.map(({ command, index }) => {
+                    const isActive = index === active;
+                    const hint = matchReason(command, query);
+                    return (
+                      <div
+                        key={command.id}
+                        id={`cmd-${command.id}`}
+                        data-command
+                        data-active={isActive}
+                        role="option"
+                        aria-selected={isActive}
+                        onMouseMove={() => setActive(index)}
+                        onClick={() => run(command)}
+                        className={`flex cursor-pointer items-baseline justify-between gap-4 px-4 py-2 ${
+                          isActive
+                            ? "bg-copper-wash text-copper"
+                            : "text-silk hover:text-copper"
+                        }`}
+                      >
+                        <span>{command.label}</span>
+                        {hint && (
+                          <span className="shrink-0 font-mono text-micro text-silk-faint">
+                            {hint}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
 
             <p className="border-t border-hairline px-4 py-2.5 font-mono text-micro text-silk-faint">
               ↑↓ move · ↵ open · esc close

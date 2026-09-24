@@ -2,12 +2,14 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-import { ThemeScript } from "@/components/theme/theme-script";
 import { SiteHeader } from "@/components/nav/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TraceBus } from "@/components/nav/trace-bus";
+import { CircuitBackdrop } from "@/components/visuals/circuit-backdrop";
+import { INTRO_SCRIPT, Intro } from "@/components/intro";
 import { NavStateProvider, NAV_END_ID } from "@/lib/nav-state";
 import { SITE } from "@/config/site";
+import { PROJECTS } from "@/data/projects";
 
 /* Two typefaces, exactly (DESIGN_BRIEF.md §3.1). Self-hosted by next/font, so
    there is no third-party request and no layout shift. Only the weights the
@@ -27,46 +29,89 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  // Without metadataBase, Next emits relative og:image URLs and most scrapers
+  // refuse them, so the card silently renders without an image.
+  metadataBase: new URL(SITE.url),
   title: {
     default: `${SITE.name} — ${SITE.role}`,
     template: `%s — ${SITE.name}`,
   },
   description: SITE.description,
+  applicationName: SITE.name,
+  authors: [{ name: SITE.name }],
+  creator: SITE.name,
+  keywords: [
+    "software engineering",
+    "McMaster University",
+    "portfolio",
+    ...PROJECTS.map((p) => p.name),
+  ],
   openGraph: {
     title: `${SITE.name} — ${SITE.role}`,
     description: SITE.description,
+    url: SITE.url,
+    siteName: SITE.name,
     type: "profile",
     locale: "en_CA",
+    // The image itself comes from src/app/opengraph-image.tsx.
   },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE.name} — ${SITE.role}`,
+    description: SITE.description,
+  },
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
 };
 
 export const viewport: Viewport = {
-  // Matches the substrate token per theme, so the browser chrome does not
-  // flash white on a phone.
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0e11" },
-    { media: "(prefers-color-scheme: light)", color: "#f6f4f1" },
-  ],
+  // Matches the substrate token, so the browser chrome does not flash white
+  // on a phone. The site is dark only.
+  themeColor: "#0b0e11",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      // The blocking script writes data-theme before React sees the document.
+      // The intro script in <head> may set data-intro before React sees the
+      // document, so the server and client <html> attributes can differ.
       suppressHydrationWarning
       className={`${plexSans.variable} ${plexMono.variable} h-full`}
     >
       <head>
-        <ThemeScript />
+        {/* Decides, before first paint, whether the first-visit intro plays.
+            See components/intro.tsx. */}
+        <script dangerouslySetInnerHTML={{ __html: INTRO_SCRIPT }} />
+        {/* Entrance animations start from hidden inline styles that only
+            JavaScript clears. Without it, show everything in its final state
+            rather than leave headings and prose invisible. [data-js-only]
+            marks things that are blank without JS (the graph canvas), which
+            are better absent than empty. */}
+        <noscript>
+          <style>{`[data-reveal]{opacity:1!important;transform:none!important}[data-js-only]{display:none!important}`}</style>
+        </noscript>
       </head>
-      <body className="flex min-h-full flex-col" id="top">
+      <body
+        className="flex min-h-full flex-col"
+        id="top"
+        // Browser extensions (Grammarly, password managers) stamp their own
+        // attributes onto <body> before React hydrates, which React reports
+        // as a mismatch. This silences attribute mismatches on this one
+        // element only; it does not reach its children, so a real mismatch
+        // anywhere in the page is still reported.
+        suppressHydrationWarning
+      >
         <a
           href="#main"
           className="sr-only rounded-trace border border-hairline bg-surface px-4 py-2 text-silk focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50"
         >
           Skip to content
         </a>
+
+        <CircuitBackdrop />
+        <Intro />
 
         <NavStateProvider>
           <TraceBus />

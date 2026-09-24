@@ -1,10 +1,10 @@
 "use client";
 
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { CommandPalette } from "@/components/nav/command-palette";
 import { useNavState } from "@/lib/nav-state";
 import { SECTIONS } from "@/lib/sections";
+import { ContactLinks } from "@/components/contact-links";
 import { SITE } from "@/config/site";
 
 /**
@@ -17,6 +17,11 @@ import { SITE } from "@/config/site";
  * The two are wired to the same state, so hovering or focusing a link here
  * lights the matching pad on the bus and fires its packet. They read as one
  * instrument rather than two copies of a menu.
+ *
+ * The contact links appear here as well as in the footer, so they are one
+ * glance away from anywhere on the page. Below `sm` there is no room for five
+ * square controls beside the name, so on a phone they move into the menu sheet
+ * rather than disappearing.
  *
  * No backdrop-blur: a solid substrate bar, per the glassmorphism entry in
  * DESIGN_BRIEF.md §1b.
@@ -60,8 +65,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
+          <ContactLinks className="hidden sm:flex" />
+          <span
+            aria-hidden="true"
+            className="mx-1 hidden h-5 w-px bg-hairline sm:block"
+          />
           <CommandPalette />
-          <ThemeToggle />
           <MobileNav />
         </div>
       </div>

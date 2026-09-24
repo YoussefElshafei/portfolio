@@ -38,48 +38,54 @@ const TRACES: readonly { d: string; lit?: boolean }[] = [
 
 export function PipelineDiagram() {
   return (
-    <figure className="my-8">
-      <svg
-        viewBox="0 0 450 160"
-        className="w-full max-w-[28rem] border border-hairline"
-        role="img"
-        aria-label="Ingestion pipeline: a market data provider feeds Kafka, which fans out to two independent consumer groups. One stores raw trades in Postgres; the other aggregates into one-minute bars with rollups."
-      >
-        {TRACES.map((t) => (
-          <path
-            key={t.d}
-            d={t.d}
-            fill="none"
-            strokeWidth={1}
-            stroke={t.lit ? "var(--copper)" : "var(--edge)"}
-          />
-        ))}
-
-        {BOXES.map((b) => (
-          <g key={b.label}>
-            <rect
-              x={b.x}
-              y={b.y}
-              width={b.w}
-              height={BOX_H}
-              rx={2}
-              fill="var(--surface)"
-              stroke="var(--edge)"
+    <figure className="mt-8 w-full max-w-column">
+      {/* The frame spans the column so its edges line up with the text; the
+          drawing inside stays at its designed size (36rem), because scaling
+          it to the full column would render its labels larger than body
+          text. */}
+      <div className="border border-hairline px-4 py-3">
+        <svg
+          viewBox="0 0 450 160"
+          className="mx-auto block w-full max-w-[36rem]"
+          role="img"
+          aria-label="Ingestion pipeline: a market data provider feeds Kafka, which fans out to two independent consumer groups. One stores raw trades in Postgres; the other aggregates into one-minute bars with rollups."
+        >
+          {TRACES.map((t) => (
+            <path
+              key={t.d}
+              d={t.d}
+              fill="none"
               strokeWidth={1}
+              stroke={t.lit ? "var(--copper)" : "var(--edge)"}
             />
-            <text
-              x={b.x + b.w / 2}
-              y={b.y + BOX_H / 2 + 3.5}
-              textAnchor="middle"
-              fontFamily="var(--font-mono)"
-              fontSize={10}
-              fill="var(--silk-dim)"
-            >
-              {b.label}
-            </text>
-          </g>
-        ))}
-      </svg>
+          ))}
+
+          {BOXES.map((b) => (
+            <g key={b.label}>
+              <rect
+                x={b.x}
+                y={b.y}
+                width={b.w}
+                height={BOX_H}
+                rx={2}
+                fill="var(--surface)"
+                stroke="var(--edge)"
+                strokeWidth={1}
+              />
+              <text
+                x={b.x + b.w / 2}
+                y={b.y + BOX_H / 2 + 3.5}
+                textAnchor="middle"
+                fontFamily="var(--font-mono)"
+                fontSize={10}
+                fill="var(--silk-dim)"
+              >
+                {b.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
       <figcaption className="mt-3 text-micro text-silk-faint">
         Two independent consumer groups read the same trade topic.
       </figcaption>

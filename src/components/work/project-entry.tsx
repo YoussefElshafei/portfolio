@@ -2,6 +2,8 @@ import Image from "next/image";
 import type { Project, ProjectLink } from "@/data/projects";
 import { PipelineDiagram } from "@/components/visuals/pipeline";
 import { TerminalBlock } from "@/components/visuals/terminal";
+import { BridgeAidDemo } from "@/components/visuals/bridgeaid-demo";
+import { HexBoard } from "@/components/visuals/hex-board";
 import { LiveSignal } from "@/components/visuals/live-signal";
 import { Fade } from "@/components/motion/reveal";
 
@@ -36,13 +38,38 @@ function LinkButton({ link }: { link: ProjectLink }) {
 }
 
 /**
+ * A live demo is the strongest thing an entry can offer (a reviewer can use
+ * the software, not just read about it), so it is the one filled control in
+ * the section and sits right under the title rather than after the prose.
+ *
+ * Copper on substrate clears 7.24:1 dark and 5.91:1 light (globals.css), so
+ * the inverted label is as legible as body text. Hover darkens by opacity
+ * rather than a second accent hex, which would need its own contrast check.
+ */
+function DemoButton({ link }: { link: ProjectLink }) {
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label={link.a11yLabel ?? link.label}
+      className="inline-flex items-center gap-2 rounded-trace border border-copper bg-copper px-4 py-2 text-micro font-semibold text-substrate hover:opacity-85"
+    >
+      {link.label}
+      <ArrowOut />
+    </a>
+  );
+}
+
+/**
  * One project.
  *
- * Order is deliberate: the problem / constraint / trade-off framing comes
- * before the implementation bullets, so the entry reads as an argument rather
- * than a feature list (DESIGN_BRIEF.md §1d).
+ * Order is deliberate: the write-up, which says what the project does and why
+ * it was built the way it was, comes before the implementation bullets, so the
+ * entry reads as an explanation rather than a feature list (DESIGN_BRIEF.md
+ * §1d).
  *
- * The bullets sit behind a native <details>. That keeps six projects scannable
+ * The bullets sit behind a native <details>. That keeps five projects scannable
  * without hiding anything, and native disclosure is keyboard accessible and
  * works with JavaScript disabled — no state, no library.
  *
@@ -55,8 +82,7 @@ export function ProjectEntry({ project }: { project: Project }) {
     name,
     tagline,
     status,
-    summary,
-    framing,
+    description,
     details,
     stack,
     links,
@@ -65,6 +91,9 @@ export function ProjectEntry({ project }: { project: Project }) {
     liveSignal,
     team,
   } = project;
+
+  const demos = links.filter((l) => l.kind === "demo");
+  const others = links.filter((l) => l.kind !== "demo");
 
   return (
     <article
@@ -85,60 +114,48 @@ export function ProjectEntry({ project }: { project: Project }) {
 
       <p className="mt-1 text-micro text-silk-faint">{tagline}</p>
 
-      <Fade className="mt-5 max-w-prose text-silk-dim">
-        <p>{summary}</p>
-      </Fade>
+      {demos.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {demos.map((link) => (
+            <DemoButton key={link.href} link={link} />
+          ))}
+        </div>
+      )}
 
       {/*
-        Every project image sits in the same 3:2 frame, regardless of its own
-        proportions — the three sources run from 1:1 to 2.34:1, and at their
-        natural ratios the entries read as wildly uneven blocks.
-
-        `object-contain`, not `cover`: a CAD drawing and a map screenshot are
-        evidence, and cropping them to fit a shape throws away the part that
-        makes them evidence. The letterboxing sits on `surface`, so it reads as
-        a deliberate plate rather than a gap. Nothing is ever scaled up past
-        its source, because contain only ever shrinks to fit this box.
+        An image sits in a 3:2 frame at the column width, like every other
+        piece of media, so its edges line up with the text beneath it.
+        `object-contain`, not `cover`: a screenshot is evidence, and cropping
+        it to fit a shape throws away the part that makes it evidence.
       */}
       {image && (
-        <div className="relative mt-8 aspect-[3/2] w-full max-w-figure overflow-hidden rounded-trace border border-hairline bg-surface">
+        <div className="relative mt-8 aspect-[3/2] w-full max-w-column overflow-hidden rounded-trace border border-hairline bg-surface">
           <Image
             src={image.src}
             alt={image.alt}
             fill
-            // The frame is at most 832px wide, and contain means a portrait or
-            // square image occupies less than that. Asking for more would have
-            // the browser fetch a candidate it cannot use.
-            sizes="(min-width: 1024px) 832px, 100vw"
+            // The column is 50rem (800px); never ask for more.
+            sizes="(min-width: 900px) 800px, 100vw"
             className="object-contain"
           />
         </div>
       )}
       {visual === "pipeline" && <PipelineDiagram />}
       {visual === "terminal" && <TerminalBlock />}
+      {visual === "bridgeaid-map" && <BridgeAidDemo />}
+      {visual === "hex-board" && <HexBoard />}
       {liveSignal && <LiveSignal />}
 
-      <dl className="mt-8 max-w-prose space-y-4">
-        {(
-          [
-            ["Problem", framing.problem],
-            ["Constraint", framing.constraint],
-            ["Trade-off", framing.tradeoff],
-          ] as const
-        ).map(([label, text]) => (
-          <div key={label} className="sm:flex sm:gap-6">
-            {/* These are prose labels, not machine facts, so they stay in the
-                sans face however much a mono label would look the part. */}
-            <dt className="w-28 shrink-0 text-micro font-medium text-silk">
-              {label}
-            </dt>
-            <dd className="mt-1 text-silk-dim sm:mt-0">{text}</dd>
-          </div>
+      {/* The write-up follows all of the media, so each entry shows the work
+          first and then explains it. */}
+      <Fade className="mt-8 max-w-column space-y-4 text-silk-dim">
+        {description.map((para) => (
+          <p key={para}>{para}</p>
         ))}
-      </dl>
+      </Fade>
 
       {details.length > 0 && (
-        <details className="group mt-6 max-w-prose">
+        <details className="group mt-8 max-w-column">
           <summary className="inline-flex cursor-pointer items-center gap-2 text-micro text-silk-dim hover:text-copper">
             <span
               aria-hidden="true"
@@ -162,7 +179,7 @@ export function ProjectEntry({ project }: { project: Project }) {
       )}
 
       {team && (
-        <p className="mt-6 max-w-prose text-micro text-silk-faint">{team}</p>
+        <p className="mt-6 max-w-column text-micro text-silk-faint">{team}</p>
       )}
 
       <ul className="mt-7 flex flex-wrap gap-x-2 gap-y-2">
@@ -176,9 +193,9 @@ export function ProjectEntry({ project }: { project: Project }) {
         ))}
       </ul>
 
-      {links.length > 0 && (
+      {others.length > 0 && (
         <div className="mt-6 flex flex-wrap gap-3">
-          {links.map((link) => (
+          {others.map((link) => (
             <LinkButton key={link.href} link={link} />
           ))}
         </div>

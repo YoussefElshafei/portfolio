@@ -150,7 +150,7 @@ Nodes are your projects. Edges connect projects that share a technology or a pro
   layered over a semantic `<ul>`.
 - Below `md`, the graph is replaced by the underlying list. Not scaled down, replaced.
 
-### 2.3 Packet motion (the only continuous animation)
+### 2.3 Packet motion (the only continuous animation — see §2.7 for the two amended exceptions)
 
 A single small dot traverses a trace segment on hover or focus of a link, once, ~500ms,
 then stops. No ambient looping anywhere on the site.
@@ -197,6 +197,37 @@ Never headings. Never prose. Never a section label. This single rule does most o
 of making the site feel technical rather than costumed, and it is mechanically checkable in
 review.
 
+### 2.7 Amendment (2026-09-23): deliberate ambient motion
+
+Requested by the site owner after using the live site. This **overrides** the "no ambient
+looping anywhere" line in §2.3, the "diagram rather than a screensaver" line in §2.2, the
+"no coloured glows" line in §2.5 (for the graph's idle cue only), and the "Hero: no
+animation" line in §2.4 (for the first-visit intro only), for exactly the elements below
+and nowhere else. Packet motion on links stays hover/focus-only.
+
+- **Project graph (3D).** Nodes gain a committed `z`. The object is still rigid and
+  precomputed, with no physics or per-load jitter. What changes is the viewing angle: a
+  slow ambient rotation (about 90s a turn, on a drifting axis) and trackball
+  drag-to-rotate. Hand-rolled rotation matrix and perspective projection; no WebGL
+  library. Reduced motion: fixed orientation, drag still available (user-initiated).
+- **Graph idle cue.** While nobody is interacting, one node carries a soft copper glow,
+  moving to a different node every 6s, as a hint that the graph responds. Any hover,
+  focus, filter or drag stops it; it returns 2.5s after interaction ends. Reduced motion:
+  no glow, a static text hint instead.
+- **Circuit backdrop.** A faint (3.5–4.5% of silk) field of PCB traces behind the page,
+  drifting one tile per four minutes, with a pair of copper pulses along a long trace
+  every 7–9s. CSS only. Reduced motion: static field.
+- **WireFish terminal.** Types the documented commands with labelled sample output, types
+  `clear`, and loops while on screen. Reduced motion: one static transcript.
+- **Catan hex board.** Redraws itself every ~4s while on screen. Reduced motion: static.
+- **First-visit intro.** A few seconds of the Live Signal chart finding one anomaly, then
+  the site. Once per browser session, skippable by any input, never under reduced motion,
+  never without JavaScript, never on a deep link.
+
+Guard rails that still apply: all of these stay below the trace bus in contrast, all are
+`aria-hidden` and never the only route to content, everything off screen stops running,
+and everything is static under `prefers-reduced-motion` except user-initiated dragging.
+
 ---
 
 ## 3. Type and color
@@ -231,7 +262,7 @@ neon-cyan-on-black.
 
 **One accent. One status color. Everything else neutral.**
 
-#### Dark theme (primary)
+#### Palette (dark only)
 
 | Token                | Hex       | Contrast on bg | Use                                                          |
 | -------------------- | --------- | -------------- | ------------------------------------------------------------ |
@@ -245,36 +276,19 @@ neon-cyan-on-black.
 | `accent`             | `#F0803C` | **7.24:1**     | Copper. Links, active trace, focus ring                      |
 | `signal`             | `#4FB6A8` | **7.92:1**     | Status only: live, passing, shipped                          |
 
-#### Light theme (its own palette, not an inversion)
-
-| Token                | Hex       | Contrast on bg | Use                              |
-| -------------------- | --------- | -------------- | -------------------------------- |
-| `bg`                 | `#F6F4F1` | —              | Warm paper. Not `#FFF`           |
-| `surface`            | `#FFFFFF` | —              | Raised regions                   |
-| `hairline`           | `#E2DDD7` | 1.23:1         | Decorative rules only            |
-| `border-interactive` | `#8F867B` | 3.26:1         | Control boundaries               |
-| `text-primary`       | `#15181B` | **16.23:1**    | Headings, body                   |
-| `text-secondary`     | `#545C64` | **6.19:1**     | Supporting prose                 |
-| `text-tertiary`      | `#5F6874` | **5.14:1**     | Mono labels, captions            |
-| `accent`             | `#9A4512` | **5.91:1**     | Copper, darkened and desaturated |
-| `signal`             | `#1F6F66` | **5.43:1**     | Status only                      |
-
-**Why light mode needs its own accent, measured:** the dark-theme copper `#F0803C` on the
-light background scores **2.43:1**, and the dark-theme teal scores **2.23:1**. Both fail AA
-badly. Same hue family, different lightness and chroma. The accent is a token _pair_, never
-one hex reused.
-
 All ratios above were computed against the WCAG 2.1 relative-luminance formula. Every text
-token clears **4.5:1**; the accent clears 4.5:1 in both themes, so it is safe on body-size
-links and as a `:focus-visible` ring (which needs only 3:1).
+token clears **4.5:1**, and the accent clears 4.5:1, so it is safe on body-size links and as
+a `:focus-visible` ring (which needs only 3:1).
 
-**Dark theme is the default.** Resolution happens in a blocking inline script before first
-paint so there is no flash, with `localStorage` override and `prefers-color-scheme` fallback.
+**Dark only (amended 2026-09-23).** The site originally shipped a separately-tuned light
+palette, a toggle, and a blocking theme script with a `localStorage` override and a
+`prefers-color-scheme` fallback. All of it was removed at the owner's request; the site is
+dark only, and the code for switching was deleted rather than left unreachable.
 
 ### 3.3 Spacing and scale
 
 4px base unit. Type scale `1.25` ratio, capped at six steps. Two container widths only:
-`prose` (68ch) and `wide` (1120px). Anything outside those is a deliberate exception and
+`column` (50rem, about 95 characters of body text) and `wide` (1360px). Anything outside those is a deliberate exception and
 gets a comment saying why.
 
 ---

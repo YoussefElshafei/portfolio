@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SECTIONS } from "@/lib/sections";
+import { ContactLinks } from "@/components/contact-links";
 
 /**
  * Sheet navigation.
@@ -158,6 +159,12 @@ export function MobileNav() {
                   ))}
                 </ul>
               </nav>
+
+              {/* The header hides its contact links below `sm`, so on a phone
+                  they live here and are never more than one tap away. */}
+              <div className="border-t border-hairline px-5 py-4 sm:hidden">
+                <ContactLinks />
+              </div>
             </motion.div>
           </div>
         )}

@@ -1,7 +1,7 @@
 import { Section } from "@/components/sections/section";
 import { Fade } from "@/components/motion/reveal";
 import { ContactLinks } from "@/components/contact-links";
-import { CONTACT } from "@/config/site";
+import { CONTACT, RESUME_PATH } from "@/config/site";
 
 /**
  * Contact.
@@ -14,8 +14,8 @@ import { CONTACT } from "@/config/site";
  */
 export function Contact() {
   return (
-    <Section id="contact" ref_="06" title="Contact" className="pb-24">
-      <Fade className="max-w-prose text-silk-dim">
+    <Section id="contact" ref_="05" title="Contact" className="pb-24">
+      <Fade className="max-w-column text-silk-dim">
         <p>
           The quickest way to reach me is email. I read everything that arrives.
         </p>
@@ -27,6 +27,22 @@ export function Contact() {
       >
         {CONTACT.email}
       </a>
+
+      {/* Renders only once RESUME_PATH points at a real file. */}
+      {RESUME_PATH && (
+        <p className="mt-6">
+          <a
+            href={RESUME_PATH}
+            download
+            className="inline-flex items-center gap-2 rounded-trace border border-hairline px-3 py-1.5 text-micro text-silk-dim hover:border-edge hover:text-copper"
+          >
+            Download résumé
+            <span aria-hidden="true" className="font-mono text-silk-faint">
+              PDF
+            </span>
+          </a>
+        </p>
+      )}
 
       <div className="mt-10">
         <ContactLinks />

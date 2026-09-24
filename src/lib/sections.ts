@@ -20,9 +20,10 @@ export const SECTIONS: readonly Section[] = [
   // DESIGN_BRIEF.md §1d is explicit that depth of work is what reads as senior.
   { id: "work", label: "Projects", ref: "02" },
   { id: "skills", label: "Skills", ref: "03" },
-  { id: "experience", label: "Experience", ref: "04" },
-  { id: "involvement", label: "Involvement", ref: "05" },
-  { id: "contact", label: "Contact", ref: "06" },
+  // Experience was a section of one entry; it is part of the Involvement
+  // timeline now.
+  { id: "involvement", label: "Involvement", ref: "04" },
+  { id: "contact", label: "Contact", ref: "05" },
 ] as const;
 
 export const SECTION_IDS = SECTIONS.map((s) => s.id);

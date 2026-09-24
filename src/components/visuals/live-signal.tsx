@@ -45,6 +45,21 @@ function halfDomain(points: readonly Sample[]): number {
 
 const fmt = (n: number, dp = 2) => (Number.isFinite(n) ? n.toFixed(dp) : "—");
 
+/**
+ * Presentation only. The series is a mean-reverting walk around zero, which
+ * reads as abstract; offset by a notional 100 it reads as a price. Nothing
+ * statistical changes: σ and z are identical under a constant shift, so the
+ * detector and its tests are untouched.
+ */
+const PRICE_BASE = 100;
+const price = (v: number) => fmt(PRICE_BASE + v);
+
+/**
+ * A made-up symbol, formatted so it cannot be mistaken for a real listing:
+ * real tickers do not carry a "-SIM" suffix.
+ */
+const TICKER = "TW-SIM";
+
 /** The series' own clock. A wall-clock time would imply this synthetic stream
  *  is tied to real market hours, and it cannot be server-rendered without a
  *  hydration mismatch. The tick index is deterministic and honest. */
@@ -54,9 +69,31 @@ export function LiveSignal() {
   const [points, setPoints] = useState<readonly Sample[]>(INITIAL);
   const [flag, setFlag] = useState<Sample | null>(INITIAL_FLAG);
   const streamRef = useRef<SignalStream | null>(null);
+  const figureRef = useRef<HTMLElement>(null);
+  const [inView, setInView] = useState(false);
   const reduced = useReducedMotion();
 
+  /*
+   * The widget sits well below the fold. Without this it would start ticking
+   * the moment the page hydrates and keep running while the visitor is still
+   * reading the hero — computing statistics and re-rendering for a chart
+   * nobody has scrolled to. The stream only runs while it is actually on
+   * screen, which together with the visibilitychange pause means it costs
+   * nothing until it is being looked at.
+   */
   useEffect(() => {
+    const el = figureRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { rootMargin: "120px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView) return;
     // Fast-forward a fresh stream past the primed prefix so ticking continues
     // exactly where the server-rendered chart left off.
     streamRef.current ??= createSignalStream(SEED, PRIMED_TICKS);
@@ -91,7 +128,7 @@ export function LiveSignal() {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [reduced]);
+  }, [reduced, inView]);
 
   const latest = points[points.length - 1];
   const half = halfDomain(points);
@@ -115,27 +152,69 @@ export function LiveSignal() {
 
   const flagged = points.map((p, i) => ({ p, i })).filter(({ p }) => p.anomaly);
   const newestFlagIndex = flagged.length ? flagged[flagged.length - 1].i : -1;
+  const newestFlag = newestFlagIndex >= 0 ? points[newestFlagIndex] : null;
+
+  /*
+   * The band is mean ± THRESHOLD·σ: exactly the region the detector treats as
+   * normal. A point is flagged precisely when the line leaves the band, so the
+   * whole idea of the check is visible without reading a word.
+   */
+  const band =
+    points
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.mean + THRESHOLD * p.std).toFixed(1)}`,
+      )
+      .join(" ") +
+    " " +
+    [...points]
+      .map((p, i) => ({ p, i }))
+      .reverse()
+      .map(
+        ({ p, i }) =>
+          `L ${x(i).toFixed(1)} ${y(p.mean - THRESHOLD * p.std).toFixed(1)}`,
+      )
+      .join(" ") +
+    " Z";
 
   return (
-    <figure className="mt-8 w-full max-w-figure">
+    <figure ref={figureRef} className="mt-8 w-full max-w-column">
       <div className="overflow-hidden rounded-trace border border-hairline bg-surface">
-        <div className="flex items-baseline justify-between border-b border-hairline px-4 py-2.5">
+        {/* Header, styled as a small trading monitor: what this is, then
+            the instrument and its last price. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hairline px-4 py-2.5">
           <span className="text-micro font-medium text-silk-dim">
-            Live signal
+            TradeWatch · live demo
           </span>
           <span className="font-mono text-micro text-silk-faint">
             window {WINDOW} · |z| &gt; {THRESHOLD}
           </span>
         </div>
 
-        <div className="px-4 pt-4">
+        <div className="flex flex-wrap items-baseline gap-x-3 px-4 pt-4">
+          {/* Symbol and price are machine facts, so mono (§2.6). */}
+          <span
+            className="rounded-trace border border-hairline px-1.5 py-0.5 font-mono text-micro text-silk-dim"
+            title="Synthetic symbol, not a real listing"
+          >
+            {TICKER}
+          </span>
+          <span className="font-mono text-h3 text-silk tabular-nums">
+            {price(latest?.value ?? Number.NaN)}
+          </span>
+        </div>
+
+        <div className="relative mx-4 mt-3">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            className="w-full"
+            className="block w-full"
             aria-hidden="true"
             focusable="false"
             preserveAspectRatio="none"
           >
+            {/* Normal range: mean ± threshold·σ. Leaving it is what gets a
+                point flagged. */}
+            <path d={band} fill="var(--silk)" fillOpacity={0.05} />
             {/* rolling mean: the baseline each point is judged against */}
             <path
               d={meanLine}
@@ -185,14 +264,42 @@ export function LiveSignal() {
               />
             )}
           </svg>
+
+          {/*
+            The "something unusual just happened" moment, visible at a glance
+            rather than only in the caption line below. HTML rather than SVG
+            text because the chart is stretched non-uniformly
+            (preserveAspectRatio="none"), which would distort glyphs. It is
+            positioned in percentages of the same coordinate system, so it
+            tracks its point at any width. Only the newest flag gets a tag;
+            one per spike would clutter the chart during a volatile stretch.
+            aria-hidden: the polite live region below already announces it.
+          */}
+          {newestFlag && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute rounded-trace border border-copper bg-surface px-1 font-mono text-micro leading-4 text-copper"
+              style={{
+                left: `${(x(newestFlagIndex) / W) * 100}%`,
+                top: `${(y(newestFlag.value) / H) * 100}%`,
+                // Sit above a low point, below a high one, and flip left near
+                // the right edge so the tag never leaves the chart.
+                transform: `translate(${
+                  newestFlagIndex > VIEW * 0.8 ? "calc(-100% - 6px)" : "6px"
+                }, ${newestFlag.value < 0 ? "calc(-100% - 4px)" : "4px"})`,
+              }}
+            >
+              ANOMALY
+            </span>
+          )}
         </div>
 
         {/* Every readout here is a measurement, so the whole row is mono (§2.6). */}
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 px-4 py-4 font-mono text-micro sm:grid-cols-4">
           {(
             [
-              ["value", fmt(latest?.value ?? Number.NaN)],
-              ["mean", fmt(latest?.mean ?? Number.NaN)],
+              ["price", price(latest?.value ?? Number.NaN)],
+              ["mean", price(latest?.mean ?? Number.NaN)],
               ["σ", fmt(latest?.std ?? Number.NaN)],
               ["z", fmt(latest?.z ?? Number.NaN)],
             ] as const
@@ -234,18 +341,19 @@ export function LiveSignal() {
       </div>
 
       <figcaption className="mt-3 text-micro text-silk-faint">
-        A synthetic series generated in the browser from a fixed seed, checked
-        against a rolling mean and standard deviation over the last {WINDOW}{" "}
-        points. The same class of statistical check{" "}
+        A simplified live demo of the same statistical check{" "}
         <a
           href="#work-tradewatch"
           className="text-silk-dim underline decoration-hairline underline-offset-2 hover:text-copper hover:decoration-copper"
         >
           TradeWatch
         </a>{" "}
-        runs against real market data — not fraud or manipulation detection,
-        just &ldquo;unusual relative to its own recent history&rdquo;. The
-        detector has no knowledge of where the shocks are.
+        runs against real market data. The prices are synthetic, generated in
+        your browser from a fixed seed. The shaded band is the normal range: the
+        rolling average of the last {WINDOW} points, plus or minus {THRESHOLD}{" "}
+        standard deviations. A point outside it is flagged as unusual for this
+        series, which is not the same as fraud or manipulation. The detector
+        never knows in advance where the jumps are.
       </figcaption>
     </figure>
   );

@@ -4,19 +4,18 @@
    PALETTE — DESIGN_BRIEF.md §3.2
 
    These hex values are contrast-checked. Every text token clears WCAG AA 4.5:1
-   against its own theme's `substrate`, and `copper` clears 4.5:1 in both themes
-   so it is safe for body-size links and for the focus ring.
+   against `substrate`, and `copper` clears 4.5:1 so it is safe for body-size
+   links and for the focus ring. Do not edit a value here without re-running
+   the contrast check.
 
-   Do not edit a value here without re-running the contrast check. The dark and
-   light accents are a token PAIR, not one hex reused: dark copper #F0803C on
-   the light background measures 2.43:1 and fails badly.
+   Dark only. A light theme existed until 2026-09-23 and was removed at the
+   owner's request, together with the toggle and its switching logic.
 
    Naming is derived from printed-circuit materials, per the brief:
    substrate (board) / copper (trace) / silk (silkscreen legend).
    ========================================================================== */
 
-:root,
-:root[data-theme="dark"] {
+:root {
   color-scheme: dark;
 
   --substrate: #0b0e11; /* page                                      */
@@ -32,23 +31,6 @@
   /* Trace segments already travelled. Non-text, decorative. */
   --copper-spent: rgb(240 128 60 / 0.3);
   --copper-wash: rgb(240 128 60 / 0.08);
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-
-  --substrate: #f6f4f1; /* warm paper, not #FFF                      */
-  --surface: #ffffff;
-  --hairline: #e2ddd7; /*                            1.23:1         */
-  --edge: #8f867b; /*                            3.26:1         */
-  --silk: #15181b; /*                           16.23:1         */
-  --silk-dim: #545c64; /*                            6.19:1         */
-  --silk-faint: #5f6874; /*                            5.14:1         */
-  --copper: #9a4512; /*                            5.91:1         */
-  --signal: #1f6f66; /*                            5.43:1         */
-
-  --copper-spent: rgb(154 69 18 / 0.3);
-  --copper-wash: rgb(154 69 18 / 0.07);
 }
 
 /* ============================================================================
@@ -115,15 +97,30 @@
   --ease-trace: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Two container widths only. §3.3
-     ...plus one documented exception, which §3.3 allows so long as the reason
-     is written down. Project screenshots are up to 1908px wide; rendered at
-     the 68ch prose measure their UI text is too small to read, which defeats
-     the point of showing real software. Figures get their own width, still
-     narrower than `wide` so they stay subordinate to the text column. */
+     Every text block AND every piece of media inside a section uses
+     `column`, so a caption, chart, map or terminal always shares its left and
+     right edges with the text beneath it. A separate, wider `figure` width
+     existed for legible screenshots; with none left on the site it was
+     removed, because two widths in one column is exactly what put the edges
+     out of line. `wide` is the page frame (header, graph row, footer).
+
+     Named `column`, not `prose`, and in rem, not ch. Two bugs, one line:
+     Tailwind v4 ships a built-in `max-w-prose` utility (a static 65ch) that
+     wins over a theme token of the same name, so the old `--container-prose`
+     token was never applied at all. And `ch` is relative to the font size of
+     the element it sits on, so a small-text block (the team lines, at
+     text-micro) came out ~20% narrower than the body text above it and
+     stopped 125px short. A rem width stays fixed whatever font size it is
+     used at.
+
+     Sizes (widened 2026-09-23 because the page left too much empty space on
+     wide screens): the column is 50rem (800px), about 95 characters of body
+     text, and the frame is 1360px, which at a 1440px screen already fills
+     all the room beside the trace-bus gutter, so the centring margins
+     disappear there. */
   --container-*: initial;
-  --container-prose: 68ch;
-  --container-figure: 52rem;
-  --container-wide: 1120px;
+  --container-column: 50rem;
+  --container-wide: 1360px;
 
   /* Left gutter reserved for the trace bus. §2.1 Wide enough to hold the
      bus SVG including its hover label, so nothing overlaps the content. */
@@ -141,8 +138,9 @@ html {
   scroll-padding-top: 6rem;
 }
 
+/* No background on <body>: the page colour lives on <html>, and a body
+   background would paint over the z-index: -1 circuit backdrop and hide it. */
 body {
-  background-color: var(--substrate);
   color: var(--silk);
   font-family: var(--font-sans);
   font-size: var(--text-body);
@@ -184,42 +182,6 @@ h4 {
   html {
     scroll-behavior: auto;
   }
-}
-
-/* ============================================================================
-   THEME TRANSITION
-
-   Only applied while [data-theme-transition] is present, which the toggle sets
-   for the duration of the switch and then removes. Doing it this way means the
-   transition cannot fire on first paint (nothing has changed yet), so there is
-   no flash and no steady-state cost.
-   ========================================================================== */
-
-@media (prefers-reduced-motion: no-preference) {
-  :root[data-theme-transition],
-  :root[data-theme-transition] *,
-  :root[data-theme-transition] *::before,
-  :root[data-theme-transition] *::after {
-    transition:
-      background-color 280ms var(--ease-trace),
-      border-color 280ms var(--ease-trace),
-      color 280ms var(--ease-trace),
-      fill 280ms var(--ease-trace),
-      stroke 280ms var(--ease-trace) !important;
-  }
-}
-
-/* ============================================================================
-   THEME-DEPENDENT ICON SWAP
-
-   The toggle renders both glyphs and CSS picks one from the attribute the
-   blocking script already set. No JS state, so the correct glyph is present in
-   the very first paint and there is nothing to hydrate.
-   ========================================================================== */
-
-:root[data-theme="dark"] [data-theme-icon="light"],
-:root[data-theme="light"] [data-theme-icon="dark"] {
-  display: none;
 }
 
 /* ============================================================================
@@ -325,5 +287,261 @@ summary::-webkit-details-marker {
     transform-box: fill-box;
     transform-origin: center;
     animation: signal-pulse 900ms var(--ease-trace) 1 forwards;
+  }
+}
+
+/* ============================================================================
+   CIRCUIT BACKDROP — §2.7
+
+   A 240px tile of PCB traces (two long traces that run edge to edge, a few
+   stubs with 45° elbows ending in vias) repeated across the page. The tile is
+   an SVG used as a MASK, not a background image: the visible colour is a
+   palette token behind the mask, so it stays in step with the palette. An SVG
+   inside a data: URL cannot read the page's CSS variables.
+
+   Cost. The layer is oversized by one tile on every side and drifts one tile
+   diagonally over four minutes with a transform, so the loop is seamless and
+   the compositor moves an already-rasterised layer. Nothing repaints, and
+   there is no JavaScript.
+
+   Pulses. Two thin copper gradients sit inside the masked layer on the two
+   long traces, so the mask trims them to the trace itself and it is the trace
+   that lights up. Each one is a PAIR: a single element whose gradient has two
+   humps 280px apart, so the second pulse trails the first along the same
+   trace by roughly 0.5 to 0.8 seconds (travel speed scales with the
+   viewport). One element per pair means the pair can never drift apart and
+   costs nothing extra.
+
+   Timing: one 32s cycle, pairs at 0s and 16s on the horizontal trace and at
+   7s and 24s on the vertical one, so a pair fires every 7, 9, 8 and 8
+   seconds. CSS has no randomness, so the unevenness is authored: the rhythm
+   never settles into one steady beat. Each crossing takes about 4.5s.
+
+   The field sits at 3.5–4.5% of silk. It should be felt, not seen, and it must
+   stay well below the trace bus and project graph.
+   ========================================================================== */
+
+.circuit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.circuit-grid {
+  position: absolute;
+  inset: -240px;
+  background-color: color-mix(in srgb, var(--silk) 3.5%, transparent);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 60.5H240M180.5 0V240'/%3E%3Cpath d='M0 150.5H60L90 180.5H130M60.5 240V210L90 180.5'/%3E%3Ccircle cx='133.5' cy='180.5' r='3'/%3E%3Cpath d='M100.5 0V30L120.5 50V60.5'/%3E%3Ccircle cx='120.5' cy='60.5' r='2.5' fill='%23000'/%3E%3Ccircle cx='180.5' cy='60.5' r='4'/%3E%3Cpath d='M180.5 110H200L215 125.5H240M0 125.5H20'/%3E%3Ccircle cx='23.5' cy='125.5' r='3'/%3E%3Cpath d='M180.5 200.5H215'/%3E%3Ccircle cx='218.5' cy='200.5' r='3'/%3E%3C/svg%3E");
+  mask-size: 240px 240px;
+  mask-repeat: repeat;
+}
+
+.circuit-pulse {
+  position: absolute;
+  opacity: 0;
+}
+
+/* On the long horizontal trace at y = 60.5 + 2 tiles. Two humps, one pair. */
+.circuit-pulse-h {
+  top: 540px;
+  left: 0;
+  width: 600px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    var(--copper) 80px,
+    transparent 160px,
+    transparent 440px,
+    var(--copper) 520px,
+    transparent 600px
+  );
+}
+
+/* On the long vertical trace at x = 180.5 + 2 tiles. Two humps, one pair. */
+.circuit-pulse-v {
+  top: 0;
+  left: 660px;
+  width: 1px;
+  height: 600px;
+  background: linear-gradient(
+    180deg,
+    transparent 0,
+    var(--copper) 80px,
+    transparent 160px,
+    transparent 440px,
+    var(--copper) 520px,
+    transparent 600px
+  );
+}
+
+/* Horizontal pairs at 0s and 16s of the 32s cycle (0% and 50%). */
+@keyframes circuit-pulse-h {
+  0%,
+  50% {
+    transform: translateX(-600px);
+    opacity: 0;
+  }
+  0.8%,
+  13.3%,
+  50.8%,
+  63.3% {
+    opacity: 0.55;
+  }
+  14.1%,
+  64.1%,
+  100% {
+    transform: translateX(calc(100vw + 480px));
+    opacity: 0;
+  }
+}
+
+/* Vertical pairs at 7s and 24s of the same cycle (21.9% and 75%). */
+@keyframes circuit-pulse-v {
+  0%,
+  21.9%,
+  75% {
+    transform: translateY(-600px);
+    opacity: 0;
+  }
+  22.7%,
+  35.2%,
+  75.8%,
+  88.3% {
+    opacity: 0.55;
+  }
+  36%,
+  89.1%,
+  100% {
+    transform: translateY(calc(100vh + 480px));
+    opacity: 0;
+  }
+}
+
+@keyframes circuit-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(240px, 240px, 0);
+  }
+}
+
+/* Reduced motion: the static field only. No drift, no pulses. */
+@media (prefers-reduced-motion: no-preference) {
+  .circuit-grid {
+    animation: circuit-drift 240s linear infinite;
+    will-change: transform;
+  }
+  .circuit-pulse-h {
+    animation: circuit-pulse-h 32s linear 3s infinite;
+  }
+  .circuit-pulse-v {
+    animation: circuit-pulse-v 32s linear 3s infinite;
+  }
+}
+
+/* ============================================================================
+   FIRST-VISIT INTRO — §2.7
+
+   The overlay exists in the markup on every load but is display: none unless
+   the inline script in <head> set html[data-intro] before first paint. So a
+   returning visit in the same session, reduced motion, no JavaScript, and deep
+   links all get the page directly, with no flash of the overlay, and the page
+   never flashes before the overlay on a first visit either.
+
+   Leaving: the chart swells slightly and the overlay fades, so the site
+   appears to come up from underneath. The duration is set by the component
+   (normal exit vs. a quicker exit when skipped) through --intro-leave.
+   ========================================================================== */
+
+.intro {
+  display: none;
+}
+
+:root[data-intro] .intro {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--substrate);
+  transition: opacity var(--intro-leave, 700ms) var(--ease-trace);
+}
+
+/* No scrolling the page behind the overlay while it plays; a scroll attempt
+   skips instead. Released the moment it starts leaving, not when the fade
+   finishes, so a delayed cleanup can never leave the page unscrollable. */
+:root[data-intro="play"] {
+  overflow: hidden;
+}
+
+.intro-chart {
+  transition: transform var(--intro-leave, 700ms) var(--ease-trace);
+}
+
+:root[data-intro="leaving"] .intro {
+  opacity: 0;
+  pointer-events: none;
+}
+
+:root[data-intro="leaving"] .intro-chart {
+  transform: scale(1.12);
+}
+
+/* ============================================================================
+   SKILL CHIPS — Skills section
+
+   Each skill is drawn as a small surface-mount part: a body (the bordered
+   tag) with a lead on either side. The leads are pseudo-elements, so the
+   markup stays one plain <button> per skill.
+
+   Probe states: the probed part and its leads turn copper; parts that share
+   no project with it dim. Only opacity and colour change, and under reduced
+   motion they change instantly.
+   ========================================================================== */
+
+.chip {
+  position: relative;
+}
+
+.chip::before,
+.chip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 1px;
+  background-color: var(--edge);
+  opacity: 0.7;
+}
+
+.chip::before {
+  left: -6px;
+}
+
+.chip::after {
+  right: -6px;
+}
+
+.chip[data-state="on"]::before,
+.chip[data-state="on"]::after {
+  background-color: var(--copper);
+  opacity: 1;
+}
+
+.chip[data-state="dim"] {
+  opacity: 0.3;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chip {
+    transition:
+      opacity 150ms var(--ease-trace),
+      color 150ms var(--ease-trace),
+      border-color 150ms var(--ease-trace);
   }
 }

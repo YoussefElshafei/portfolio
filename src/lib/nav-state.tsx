@@ -75,7 +75,7 @@ export function NavStateProvider({ children }: { children: ReactNode }) {
    *
    * An IntersectionObserver still drives this rather than a scroll listener:
    * the callback fires only when a section edge crosses the viewport, not on
-   * every scroll frame, so nothing runs during the scroll itself. Reading six
+   * every scroll frame, so nothing runs during the scroll itself. Reading five
    * rects inside that callback is negligible and happens a handful of times
    * per page, not sixty times a second.
    */

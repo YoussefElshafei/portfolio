@@ -10,7 +10,7 @@ import { SITE } from "@/config/site";
  */
 export function Hero() {
   return (
-    <section id="top" className="max-w-prose pt-20 pb-24 sm:pt-28">
+    <section id="top" className="max-w-column pt-20 pb-24 sm:pt-28">
       <h1 className="text-display">{SITE.name}</h1>
       <p className="mt-3 text-h3 text-silk-dim">{SITE.role}</p>
       <p className="mt-6 text-silk-dim">
