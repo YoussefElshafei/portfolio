@@ -14,9 +14,11 @@ export function Hero() {
       <h1 className="text-display">{SITE.name}</h1>
       <p className="mt-3 text-h3 text-silk-dim">{SITE.role}</p>
       <p className="mt-6 text-silk-dim">
-        I study software engineering and business management at McMaster. I
-        build systems that run, and think about the context around them rather
-        than only the code.
+        I&apos;m a Software Engineering and Business Management student who
+        likes pairing technical problem-solving with strategic thinking. I&apos;m
+        looking to connect with peers, mentors and industry professionals, and
+        I&apos;m actively seeking internships where I can apply my skills, keep
+        learning, and contribute to projects that matter.
       </p>
       <p className="mt-8 text-micro text-silk-faint">
         {SITE.location} · {SITE.school}

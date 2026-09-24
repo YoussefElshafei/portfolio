@@ -13,7 +13,8 @@ import { SITE } from "@/config/site";
  * made on request. It is kept within the brief's other surface rules so it
  * still reads as part of the board rather than a dropped-in template: one
  * panel, never repeated or nested, hairline border, 4px radius, `surface`
- * fill for elevation, no shadow, no coloured edge.
+ * fill for elevation, no shadow. The outer edge is `copper-spent`, a faint
+ * copper outline added on request; the inner dividers stay hairline.
  *
  * No photo slot. There is no photo yet, and a placeholder silhouette is
  * exactly the kind of fake content §1a rules out. When a real one exists it
@@ -22,7 +23,7 @@ import { SITE } from "@/config/site";
 export function About() {
   return (
     <Section id="about" ref_="01" title="About" className="pb-28">
-      <div className="max-w-column rounded-trace border border-hairline bg-surface">
+      <div className="max-w-column rounded-trace border border-copper-spent bg-surface">
         <div className="border-b border-hairline px-6 py-6 sm:px-8">
           <p className="text-h3">{SITE.name}</p>
           <p className="mt-1 text-silk-dim">{SITE.role}</p>

@@ -1977,3 +1977,23 @@ Two knock-on effects of a wider column are worth noticing:
 
 Trade-off accepted: at 50rem a line of body text is roughly 95 characters,
 above the ~75 often cited as ideal for reading comfort.
+
+### 2026-09-23 — Stage 13c: hero copy and an accented About panel
+
+The hero paragraph now states intent (internships, connecting with people)
+instead of describing working style. Recruiters skim the hero first, so the
+thing you want from them belongs there, not buried in About.
+
+The About panel gained a faint copper outline. It reuses the existing
+`copper-spent` token (copper at 30% opacity) rather than an ad-hoc
+`border-copper/30`: same colour, but one name for "copper, receded" means the
+outline, spent traces and anything else faint-and-copper stay in sync if the
+accent ever changes. Only the outer edge changed; the internal dividers stay
+hairline so the accent frames the panel instead of turning it into a grid.
+
+The degree line now reads B.Eng.Mgt: McMaster's Engineering and Management
+program is one combined degree, and saying so is more accurate than listing
+two.
+
+**Concepts introduced:** put the call to action where readers look first;
+semantic tokens over one-off opacity modifiers.

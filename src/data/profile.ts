@@ -4,7 +4,7 @@
  */
 
 export const ABOUT = [
-  "Software Engineering (B.Eng.) and Business Management (B.Com.) student at McMaster University, blending technical problem-solving with strategic thinking.",
+  "Software Engineering and Business Management (B.Eng.Mgt) student at McMaster University, blending technical problem-solving with strategic thinking.",
   "Focused on building scalable, real-world systems that align engineering execution with business impact.",
 ] as const;
 
