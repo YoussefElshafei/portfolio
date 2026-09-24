@@ -87,7 +87,11 @@ type Filter = { kind: EdgeKind; key: string };
  * below hold all the content. Dragging is never the only way to reach
  * anything.
  *
- * Below `md` the diagram is replaced by that list rather than scaled down.
+ * The diagram shows at every width. It used to be replaced by the list below
+ * `md` (DESIGN_BRIEF.md §2.2), because drawn at phone width its labels shrank
+ * to ~5px; draw.ts now floors label size and hit radius in CSS pixels, so it
+ * stays legible and tappable there. The list keeps its relationship text
+ * visible below `md`, where there is no hover to reveal it.
  */
 export function ProjectGraph() {
   const [cursorNode, setCursorNode] = useState<string | null>(null);
@@ -297,7 +301,7 @@ export function ProjectGraph() {
       }
       // Hover. Only touches React state when the hovered node changes.
       const { x, y } = toViewBox(e);
-      const hit = hitTest(frame, x, y);
+      const hit = hitTest(frame, x, y, cssWidth);
       canvas.style.cursor = hit ? "pointer" : "";
       if (hit !== hoverId) {
         hoverId = hit;
@@ -314,7 +318,7 @@ export function ProjectGraph() {
       // same destination the list beside the graph links to.
       if (moved <= CLICK_SLOP_PX) {
         const { x, y } = toViewBox(e);
-        const hit = hitTest(frame, x, y);
+        const hit = hitTest(frame, x, y, cssWidth);
         if (hit) window.location.hash = `work-${hit}`;
       }
     };
@@ -381,12 +385,12 @@ export function ProjectGraph() {
       {/* data-js-only: without JavaScript the canvas is blank, and an empty
           bordered box would offer something it cannot show. The <noscript>
           rule in the root layout removes it; the list beside still works. */}
-      <div data-js-only className="hidden min-w-0 flex-1 md:block">
+      <div data-js-only className="min-w-0 flex-1">
         <canvas
           ref={canvasRef}
-          // touch-none: on a tablet a drag here turns the graph rather than
-          // scrolling the page. The graph is a bounded box, so the page is
-          // still scrollable everywhere around it.
+          // touch-none: on a touch screen a drag here turns the graph rather
+          // than scrolling the page. The graph is a bounded box (~220px tall
+          // on a phone), so the page still scrolls above and below it.
           className="block aspect-[820/520] w-full cursor-grab touch-none border border-hairline bg-substrate select-none"
           aria-hidden="true"
         />

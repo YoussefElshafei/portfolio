@@ -88,13 +88,47 @@ export function computeFrame(R: Mat3): Frame {
   return { nodes, bends };
 }
 
+/* ---------------------------------------------------------------------------
+   Narrow screens
+
+   Everything is drawn in viewBox units and scaled to the canvas, which is
+   right for geometry but wrong for text and touch: on a ~340px phone the
+   12.5-unit labels would render near 5px and the hit radius near 7px. So
+   labels, node dots and the hit radius are floored in CSS pixels. At desktop
+   widths the floor never binds and nothing changes.
+   --------------------------------------------------------------------------- */
+
+const LABEL_UNITS = 12.5;
+const NOTE_UNITS = 10.5;
+/** Smallest label size on screen, in CSS px. */
+const MIN_LABEL_CSS_PX = 11;
+/** Smallest hit radius on screen, in CSS px: roughly half a fingertip. */
+const MIN_HIT_CSS_PX = 22;
+const HIT_UNITS = 18;
+
+/**
+ * How much to enlarge labels and dots, in viewBox units, so they stay legible
+ * at this canvas width. 1 at desktop widths.
+ */
+export function legibility(cssWidth: number) {
+  const k = cssWidth / GRAPH_VIEWBOX.width;
+  return k > 0 ? Math.max(1, MIN_LABEL_CSS_PX / (LABEL_UNITS * k)) : 1;
+}
+
 /** The node under a viewBox point, if any. Nearest wins; ties go to the front. */
-export function hitTest(f: Frame, x: number, y: number): string | null {
+export function hitTest(
+  f: Frame,
+  x: number,
+  y: number,
+  cssWidth: number,
+): string | null {
+  const k = cssWidth / GRAPH_VIEWBOX.width;
+  const radius = Math.max(HIT_UNITS, k > 0 ? MIN_HIT_CSS_PX / k : 0);
   let best: string | null = null;
   let bestScore = Infinity;
   for (const [id, n] of f.nodes) {
     const d = Math.hypot(n.x - x, n.y - y);
-    if (d > 18) continue;
+    if (d > radius) continue;
     const score = d - n.p.depth * 4;
     if (score < bestScore) {
       bestScore = score;
@@ -292,6 +326,9 @@ export function draw(
   t: Timing,
 ) {
   const k = (cssWidth / GRAPH_VIEWBOX.width) * dpr;
+  const s = legibility(cssWidth);
+  const labelFont = `${LABEL_UNITS * s}px ${pal.font}`;
+  const noteFont = `${NOTE_UNITS * s}px ${pal.font}`;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.setTransform(k, 0, 0, k, 0, 0);
@@ -355,7 +392,7 @@ export function draw(
   // Nodes, farthest first (painter's algorithm), so nearer labels sit on top.
   ctx.setLineDash([]);
   ctx.lineWidth = 1;
-  ctx.font = `12.5px ${pal.font}`;
+  ctx.font = labelFont;
   ctx.textBaseline = "alphabetic";
   const order = [...f.nodes.entries()].sort(
     (x, y) => x[1].p.depth - y[1].p.depth,
@@ -384,7 +421,7 @@ export function draw(
     // it happens to sit at the back.
     ctx.globalAlpha = idleLit ? 1 : (0.4 + 0.6 * n.p.depth) * (dim ? 0.28 : 1);
     ctx.beginPath();
-    ctx.arc(n.x, n.y, 4.5 * n.p.scale, 0, Math.PI * 2);
+    ctx.arc(n.x, n.y, 4.5 * n.p.scale * s, 0, Math.PI * 2);
     ctx.fillStyle = lit ? pal.copper : pal.substrate;
     ctx.fill();
     ctx.strokeStyle = lit ? pal.copper : pal.edge;
@@ -395,32 +432,46 @@ export function draw(
     // where they cross, the way a PCB silkscreen legend clears the copper.
     const node = NODES.find((m) => m.id === id)!;
     const label = node.label;
+    // Labels hang off the right of the node. Enlarged on a phone, one near
+    // the right edge would run out of the frame, so it swaps to the left.
+    const gap = 12 * s;
+    let width = ctx.measureText(label).width;
+    if (node.note) {
+      ctx.font = noteFont;
+      width = Math.max(width, ctx.measureText(node.note).width);
+      ctx.font = labelFont;
+    }
+    const flip = n.x + gap + width > GRAPH_VIEWBOX.width - 4;
+    const lx = flip ? n.x - gap : n.x + gap;
+    ctx.textAlign = flip ? "right" : "left";
+
     const alpha = ctx.globalAlpha;
     ctx.globalAlpha = Math.min(1, alpha + 0.4);
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 * s;
     ctx.lineJoin = "round";
     ctx.strokeStyle = pal.substrate;
-    ctx.strokeText(label, n.x + 12, n.y + 4);
+    ctx.strokeText(label, lx, n.y + 4 * s);
     ctx.globalAlpha = alpha;
     ctx.lineWidth = 1;
     ctx.fillStyle = lit || idleLit ? pal.copper : pal.silkDim;
-    ctx.fillText(label, n.x + 12, n.y + 4);
+    ctx.fillText(label, lx, n.y + 4 * s);
 
     // A per-project annotation (e.g. a teammate on this project alone) sits
     // on a second, smaller line so it reads as a footnote to the name, with
     // the same halo so it stays legible as the graph turns.
     if (node.note) {
-      ctx.font = `10.5px ${pal.font}`;
+      ctx.font = noteFont;
       ctx.globalAlpha = Math.min(1, alpha + 0.4);
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 4 * s;
       ctx.strokeStyle = pal.substrate;
-      ctx.strokeText(node.note, n.x + 12, n.y + 18);
+      ctx.strokeText(node.note, lx, n.y + 18 * s);
       ctx.globalAlpha = alpha;
       ctx.lineWidth = 1;
       ctx.fillStyle = lit || idleLit ? pal.copper : pal.silkFaint;
-      ctx.fillText(node.note, n.x + 12, n.y + 18);
-      ctx.font = `12.5px ${pal.font}`;
+      ctx.fillText(node.note, lx, n.y + 18 * s);
+      ctx.font = labelFont;
     }
+    ctx.textAlign = "left";
   }
   ctx.globalAlpha = 1;
 }

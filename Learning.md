@@ -1997,3 +1997,38 @@ two.
 
 **Concepts introduced:** put the call to action where readers look first;
 semantic tokens over one-off opacity modifiers.
+
+### 2026-09-23 — Stage 13d: the graph that "vanished" on phones
+
+Report: the 3D project graph was invisible on a real phone but fine on a
+laptop. Checked in a real mobile emulation (412px viewport, touch, DPR 2.6),
+not a narrowed desktop window.
+
+**Root cause:** not a bug in the touch code or the sizing maths. The wrapper
+had `hidden md:block`, so below 768px it was `display: none`. The canvas was
+in the DOM with a 0×0 box and a 0×0 backing store and painted nothing. It
+was deliberate: DESIGN_BRIEF §2.2 said "below md, replace the graph with the
+list". Eliminated along the way: no touch or `navigator` branching (pointer
+events handle mouse and touch in one path), and the ResizeObserver sizing
+was fine. It just had nothing visible to measure.
+
+**Why the brief said that:** the canvas draws in a fixed 820-unit coordinate
+space scaled to fit. On a 372px canvas that's a 0.45× scale, so 12.5-unit
+labels would render at ~5.6px and the 18-unit tap radius at ~8px. Removing
+`hidden` alone would have "fixed" visibility and shipped an unreadable,
+untappable diagram.
+
+**Fix:** show it at every width, and floor the things that must not scale
+in *screen* pixels: labels ≥11px, tap radius ≥22px. Geometry still scales;
+text and touch targets don't shrink below usable. A label that would then
+run off the right edge flips to the left of its node.
+
+**Verified:** before, `display: none` and 0 painted pixels. After, a
+372×236 canvas with 31k painted pixels; a synthetic touch drag rotates it
+without scrolling the page; a tap on a node follows its link.
+
+**Concepts introduced:** "invisible" has three distinct causes (not in the
+DOM, zero-size, present but unpainted), so measure which one before
+touching code; a design rule that looks arbitrary often encodes a real
+constraint, so find it before deleting the rule; scale geometry, floor
+text and hit targets in CSS pixels.

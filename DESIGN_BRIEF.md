@@ -148,7 +148,10 @@ Nodes are your projects. Edges connect projects that share a technology or a pro
   makes it feel like a diagram rather than a screensaver.
 - Full keyboard traversal: nodes are real links in a real list; the SVG is an enhancement
   layered over a semantic `<ul>`.
-- Below `md`, the graph is replaced by the underlying list. Not scaled down, replaced.
+- ~~Below `md`, the graph is replaced by the underlying list. Not scaled down, replaced.~~
+  **Amended 2026-09-23, on request:** the graph shows at every width. Plain scaling was
+  the problem (labels ~5px on a phone), so label size and hit radius are floored in CSS
+  pixels instead. The list stays below the graph with its relationship text visible.
 
 ### 2.3 Packet motion (the only continuous animation — see §2.7 for the two amended exceptions)
 
