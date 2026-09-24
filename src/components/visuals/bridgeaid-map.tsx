@@ -91,7 +91,10 @@ export default function BridgeAidMap() {
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            // The single-host URL OSM asks for; the a/b/c subdomains are
+            // deprecated. It is also the only third-party origin the CSP in
+            // next.config.ts allows.
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {SAMPLE_INCIDENTS.map((s) => (
             <Marker key={s.id} position={s.at as [number, number]} icon={RED}>

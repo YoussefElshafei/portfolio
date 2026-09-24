@@ -81,7 +81,11 @@ export function About() {
                           r.name
                         )}
                       </p>
-                      <p className="text-micro text-silk-faint">{r.detail}</p>
+                      {"detail" in r && (
+                        <p className="text-micro text-silk-faint">
+                          {r.detail}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -2032,3 +2032,36 @@ DOM, zero-size, present but unpainted), so measure which one before
 touching code; a design rule that looks arbitrary often encodes a real
 constraint, so find it before deleting the rule; scale geometry, floor
 text and hit targets in CSS pixels.
+
+### 2026-09-23 — Stage 14: security review, scoped to a static site
+
+A static portfolio has no database, sessions or auth, so most of OWASP
+doesn't apply. What does: secrets in git, dependency CVEs, raw-HTML
+injection, reverse tabnabbing, client storage, response headers, third-party
+requests, accidental server endpoints, and personal data.
+
+Findings worth remembering:
+
+- **"Secret" greps are noisy.** Every hit for `token` was a design token.
+  Checking the full history (`git log -p`), not just the working tree, is
+  the part people skip: a key deleted in a later commit is still public.
+- **Leaflet renders some strings as HTML** (attribution, `divIcon.html`).
+  Safe here because both are hardcoded constants, but a library taking HTML
+  strings is exactly where user input must never be routed.
+- **A CSP on a static Next.js site needs `'unsafe-inline'` for scripts.**
+  Next inlines hydration data, and the only strict alternative (per-request
+  nonces) forces dynamic rendering. `default-src 'self'`, one allowed image
+  origin, `object-src 'none'`, `base-uri 'self'` and `frame-ancestors 'none'`
+  still close off most of what a CSP is for.
+- **Headers interact with third parties.** `Referrer-Policy: no-referrer`
+  looks strictest, but OpenStreetMap's tile policy requires a Referer, so
+  it would have broken the map. `strict-origin-when-cross-origin` sends only
+  the origin cross-site.
+- **Test the failure path of storage.** A synthetic run with `sessionStorage`
+  throwing (blocked site data) showed the intro script's `try/catch` holds.
+- **Verify the header set on a production build**, not in dev: dev adds
+  `'unsafe-eval'` and `ws:` for React's debugging and hot reload.
+
+**Concepts introduced:** threat-model before checklist; CSP trade-offs
+under static generation; reverse tabnabbing and `rel="noopener"`;
+`X-Powered-By` as free reconnaissance for an attacker.

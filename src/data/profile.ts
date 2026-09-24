@@ -12,8 +12,7 @@ export const EDUCATION = {
   school: "McMaster University",
   location: "Hamilton, ON",
   degrees: [
-    "Bachelor of Engineering (B.Eng.) in Software Engineering",
-    "Bachelor of Commerce (B.Com.) in Business Management",
+    "Bachelor of Software Engineering and Business Management (B.Eng.Mgt)",
   ],
   /**
    * On the 4-point scale, per McMaster's own conversion from its 12-point
@@ -33,6 +32,8 @@ export const EDUCATION = {
  */
 export const RECOGNITION = [
   { name: "Dean's Honour List", detail: "McMaster University" },
+  // Awarding body not supplied, so no detail line rather than a guessed one.
+  { name: "Award of Excellence" },
   {
     name: "UN Sustainable Development Goals Competition",
     detail: "Multidisciplinary team, technology driven solution",
