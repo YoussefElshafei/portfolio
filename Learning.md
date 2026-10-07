@@ -2065,3 +2065,10 @@ Findings worth remembering:
 **Concepts introduced:** threat-model before checklist; CSP trade-offs
 under static generation; reverse tabnabbing and `rel="noopener"`;
 `X-Powered-By` as free reconnaissance for an attacker.
+
+### 2026-10-07 — Stage 14b: contact email
+
+The contact email changed to a career-specific address. A one-line edit in
+`src/config/site.ts`, because every mailto link and the visible address in
+Contact read from `CONTACT.email`. That's the payoff of one config file for
+identity: a change in one place can't leave a stale copy elsewhere.

@@ -36,5 +36,5 @@ export const RESUME_PATH = "";
 export const CONTACT = {
   github: "https://github.com/YoussefElshafei",
   linkedin: "https://www.linkedin.com/in/youssef-elshafei/",
-  email: "yelshafe2006@gmail.com",
+  email: "elshafei.career@gmail.com",
 } as const;
