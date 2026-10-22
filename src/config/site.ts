@@ -6,6 +6,8 @@ export const SITE = {
   role: "Software Engineering & Business Management Student",
   location: "Hamilton, ON",
   school: "McMaster University",
+  /** Shown in the hero. The owner's wording, 2026-10-21. */
+  availability: "Seeking a co-op starting May 2027 or later",
   description:
     "Software engineering and business management student at McMaster University. Projects in market data infrastructure, disaster response, network diagnostics and embedded control.",
   /**
@@ -31,6 +33,7 @@ export const SITE = {
  * empty no link renders at all — a résumé button that 404s is on the
  * anti-pattern list in DESIGN_BRIEF.md §1c.
  */
+// Empty on purpose: the owner removed the résumé download on 2026-10-21.
 export const RESUME_PATH = "";
 
 export const CONTACT = {
@@ -38,3 +41,14 @@ export const CONTACT = {
   linkedin: "https://www.linkedin.com/in/youssef-elshafei/",
   email: "elshafei.career@gmail.com",
 } as const;
+
+/**
+ * Web3Forms access key for the "Say hello" form, or "" to hide the form.
+ *
+ * Public by design: the key can only send mail to the owner's own inbox,
+ * which is all a contact form does. It lives in an environment variable
+ * (NEXT_PUBLIC_WEB3FORMS_KEY, set in .env.local and in Vercel) so it is not
+ * committed. NEXT_PUBLIC_ values are baked in at build time, so redeploy
+ * after changing it.
+ */
+export const WEB3FORMS_KEY = process.env.NEXT_PUBLIC_WEB3FORMS_KEY ?? "";

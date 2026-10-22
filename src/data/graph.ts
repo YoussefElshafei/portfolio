@@ -10,9 +10,11 @@
  * because they mean different things and the diagram should not imply
  * otherwise. A pair can have both, and then both are drawn.
  *
- * The people source exists because stack alone left WireFish (C, raw sockets)
- * with no edge at all. Inventing a shared-tech link would have been false; a
- * shared teammate is true, so that is what connects it.
+ * Teammate names were taken off the site on 2026-10-21 at the owner's request,
+ * so no project lists collaborators and the people source produces no edges.
+ * The machinery stays, dormant, in case names come back. WireFish stays
+ * connected through a real shared tag: its repository runs GitHub Actions CI,
+ * as TradeWatch's does.
  *
  * Coordinates live on each project in `projects.ts`, authored by hand and
  * committed, in 3D. There is no force simulation and no layout pass at

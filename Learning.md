@@ -23,15 +23,15 @@ anti-pattern list and the visual system; this file explains how that spec became
 
 ### Stack
 
-| Layer | Choice | Version installed |
-|---|---|---|
-| Framework | Next.js, App Router | 16.3.5 |
-| UI runtime | React | 19.2.8 |
-| Language | TypeScript, strict | 5.9.3 |
-| Styling | Tailwind CSS v4, CSS-first | 4.x |
-| Animation | `motion` (formerly Framer Motion) | 13.4.0 |
-| Icons | `lucide-react` + inlined brand marks | 1.47.0 |
-| Host | Vercel | — |
+| Layer      | Choice                               | Version installed |
+| ---------- | ------------------------------------ | ----------------- |
+| Framework  | Next.js, App Router                  | 16.3.5            |
+| UI runtime | React                                | 19.2.8            |
+| Language   | TypeScript, strict                   | 5.9.3             |
+| Styling    | Tailwind CSS v4, CSS-first           | 4.x               |
+| Animation  | `motion` (formerly Framer Motion)    | 13.4.0            |
+| Icons      | `lucide-react` + inlined brand marks | 1.47.0            |
+| Host       | Vercel                               | —                 |
 
 ### File map
 
@@ -96,8 +96,8 @@ directly. It cannot use `useState`, `useEffect`, or event handlers, because ther
 browser to run them in.
 
 `"use client"` at the top of a file marks a **client boundary**. The thing most people get
-wrong: it does not mean "this one component is a client component." It means *this module
-and everything it imports* gets bundled and shipped to the browser.
+wrong: it does not mean "this one component is a client component." It means _this module
+and everything it imports_ gets bundled and shipped to the browser.
 
 In this codebase that distinction is doing real work:
 
@@ -106,7 +106,7 @@ In this codebase that distinction is doing real work:
   for it.
 - `trace-bus.tsx`, `site-header.tsx`, `mobile-nav.tsx`, `project-graph.tsx` and
   `theme-toggle.tsx` all need interactivity, so they are client components.
-- `layout.tsx` stays a Server Component even though it *renders* client components. A
+- `layout.tsx` stays a Server Component even though it _renders_ client components. A
   server component can render a client component; it just cannot pass a function as a prop
   to one.
 
@@ -177,21 +177,21 @@ you never use is pure waste. This site ships three sans weights and two mono, 59
 
 Tailwind reads **namespaces** from the variable prefix and generates utilities:
 
-| Namespace | Generates |
-|---|---|
-| `--color-copper` | `text-copper`, `bg-copper`, `border-copper`, … |
-| `--text-h1` | `text-h1` |
-| `--radius-trace` | `rounded-trace` |
-| `--font-mono` | `font-mono` |
-| `--spacing-gutter` | `pl-gutter`, `mt-gutter`, … |
-| `--container-wide` | `max-w-wide` |
+| Namespace          | Generates                                      |
+| ------------------ | ---------------------------------------------- |
+| `--color-copper`   | `text-copper`, `bg-copper`, `border-copper`, … |
+| `--text-h1`        | `text-h1`                                      |
+| `--radius-trace`   | `rounded-trace`                                |
+| `--font-mono`      | `font-mono`                                    |
+| `--spacing-gutter` | `pl-gutter`, `mt-gutter`, …                    |
+| `--container-wide` | `max-w-wide`                                   |
 
 #### `@theme` vs `@theme inline` — the important distinction
 
 This trips people up and is a good thing to be able to explain.
 
-With plain `@theme`, Tailwind resolves the value at build time and emits the *literal
-value* into the utility class. With `@theme inline`, it emits the `var()` reference itself.
+With plain `@theme`, Tailwind resolves the value at build time and emits the _literal
+value_ into the utility class. With `@theme inline`, it emits the `var()` reference itself.
 
 ```css
 /* @theme        -> .text-copper { color: #f0803c }   (frozen at build) */
@@ -219,8 +219,8 @@ before defining replacements. The consequence is that `bg-indigo-500`, `rounded-
 That is the point. `DESIGN_BRIEF.md` lists "rounded-2xl + shadow-lg on everything" as an
 AI-generated tell. Writing that down in a document relies on discipline; deleting the
 tokens turns it into a build error. This is the single most interesting thing in the
-stylesheet and a genuinely good interview anecdote: *"I encoded the design constraints into
-the type system of the CSS so they couldn't be violated by accident."*
+stylesheet and a genuinely good interview anecdote: _"I encoded the design constraints into
+the type system of the CSS so they couldn't be violated by accident."_
 
 A caveat worth knowing: clearing `--color-*` also removes `transparent` and `current`, so
 they are re-added explicitly.
@@ -235,7 +235,9 @@ layers have a rule that surprises people:
 So this, written outside any layer in `globals.css`:
 
 ```css
-:root[data-theme="dark"] [data-theme-icon="light"] { display: none; }
+:root[data-theme="dark"] [data-theme-icon="light"] {
+  display: none;
+}
 ```
 
 wins over any Tailwind utility class, even though a utility might look more specific. This
@@ -258,7 +260,7 @@ what they chose last visit — that information lives in the browser, in
 So if you resolve the theme in React (`useEffect`, a context provider, a `useState`), the
 sequence is:
 
-1. Server sends HTML with *some* default theme — say dark.
+1. Server sends HTML with _some_ default theme — say dark.
 2. Browser paints it. **The user sees dark.**
 3. JavaScript downloads, React hydrates, `useEffect` runs, reads `localStorage`, finds
    "light".
@@ -294,11 +296,11 @@ Why each piece matters:
 - **It is inline, not `src=`.** An external script is a network round trip; the browser
   would paint before it arrives. Inline code is in the HTML already.
 - **It is in `<head>`, before `<body>`.** A classic `<script>` without `async` or `defer`
-  is *parser-blocking*: the browser stops building the DOM and executes it immediately.
+  is _parser-blocking_: the browser stops building the DOM and executes it immediately.
   Because it runs before `<body>` exists, it runs before anything has been painted.
 - **It sets an attribute on `<html>`**, which already exists at that moment. It cannot
   touch `<body>` — that has not been parsed yet.
-- **It is wrapped in `try/catch`.** `localStorage` *throws* in some privacy modes rather
+- **It is wrapped in `try/catch`.** `localStorage` _throws_ in some privacy modes rather
   than returning null. An uncaught throw here would break the whole page before it renders.
 - **Resolution order is: stored choice → OS preference → dark.** An explicit choice must
   outrank the OS setting, or the toggle appears broken after a refresh.
@@ -331,9 +333,9 @@ and CSS hides one based on `html[data-theme]`, which the blocking script already
 correct icon is in the very first paint, there is nothing to hydrate, and nothing can
 mismatch. The click handler mutates the DOM attribute and writes `localStorage` directly.
 
-**The general lesson**, which is worth stating in an interview: *if state already lives in
+**The general lesson**, which is worth stating in an interview: _if state already lives in
 the DOM and CSS can read it, duplicating it into React state creates a synchronisation
-problem you did not need to have.*
+problem you did not need to have._
 
 #### Smooth transition without a flash on load
 
@@ -343,10 +345,12 @@ load must not.
 If you put `transition: background-color 280ms` on elements permanently, the initial paint
 can animate from the browser default, which is the flash you were avoiding.
 
-The fix is to make transitions exist only *during* a deliberate switch:
+The fix is to make transitions exist only _during_ a deliberate switch:
 
 ```css
-:root[data-theme-transition] * { transition: background-color 280ms …; }
+:root[data-theme-transition] * {
+  transition: background-color 280ms …;
+}
 ```
 
 The toggle adds `data-theme-transition`, flips the theme, and removes the attribute 320ms
@@ -359,7 +363,9 @@ rather than being always-on, so there is no steady-state cost.
 #### `color-scheme`
 
 ```css
-:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
 ```
 
 This is not decoration. It tells the browser to render **native UI** — scrollbars, form
@@ -401,12 +407,12 @@ pure white).
 
 #### Thresholds
 
-| Requirement | Ratio |
-|---|---|
-| Body text, AA | **4.5:1** |
-| Large text (≥18.66px bold or ≥24px), AA | 3:1 |
-| UI component boundaries and focus indicators | 3:1 |
-| Body text, AAA | 7:1 |
+| Requirement                                  | Ratio     |
+| -------------------------------------------- | --------- |
+| Body text, AA                                | **4.5:1** |
+| Large text (≥18.66px bold or ≥24px), AA      | 3:1       |
+| UI component boundaries and focus indicators | 3:1       |
+| Body text, AAA                               | 7:1       |
 
 #### Why a light theme cannot be an inverted dark theme
 
@@ -415,7 +421,7 @@ This is the concrete example to remember. The dark theme's copper accent is `#F0
 - On the dark background `#0B0E11`: **7.24:1** — comfortably AA.
 - On the light background `#F6F4F1`: **2.43:1** — fails badly. Not even close.
 
-The reason is that `#F0803C` is a *light* colour. It has high luminance. Against a dark
+The reason is that `#F0803C` is a _light_ colour. It has high luminance. Against a dark
 background that is a large gap; against a light background there is almost no gap left.
 
 So the accent is a **token pair**: `#F0803C` in dark, `#9A4512` in light (5.91:1). Same
@@ -451,7 +457,7 @@ wrong at small sizes; a navigation element should not be rubbery.
 <path d={complexPath} pathLength={100} strokeDasharray="7 999" />
 ```
 
-`pathLength` tells the renderer to *pretend* the path is that long. All dash arithmetic
+`pathLength` tells the renderer to _pretend_ the path is that long. All dash arithmetic
 then happens in those units. Setting it to `100` means dash values become **percentages**.
 
 This is what lets one CSS keyframe drive the packet animation on every path in the app,
@@ -459,8 +465,12 @@ regardless of each path's real geometry:
 
 ```css
 @keyframes packet-travel {
-  from { stroke-dashoffset: 100; }
-  to   { stroke-dashoffset: 0; }
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 ```
 
@@ -625,16 +635,16 @@ different from `display: none`, which removes it from both.
 
 A sheet that is just a styled `div` is inaccessible. This one implements the full contract:
 
-| Requirement | Implementation |
-|---|---|
-| Announced as a dialog | `role="dialog"` |
-| Content behind is inert | `aria-modal="true"` |
-| Has an accessible name | `aria-labelledby` → the "Sections" heading |
-| Trigger state is exposed | `aria-expanded` on the button |
-| Escape closes it | `keydown` listener |
-| Focus moves in | `requestAnimationFrame` then focus first link |
-| Focus cannot escape | Tab/Shift-Tab wrap at the boundaries |
-| Focus returns on close | `triggerRef.current?.focus()` |
+| Requirement                | Implementation                                      |
+| -------------------------- | --------------------------------------------------- |
+| Announced as a dialog      | `role="dialog"`                                     |
+| Content behind is inert    | `aria-modal="true"`                                 |
+| Has an accessible name     | `aria-labelledby` → the "Sections" heading          |
+| Trigger state is exposed   | `aria-expanded` on the button                       |
+| Escape closes it           | `keydown` listener                                  |
+| Focus moves in             | `requestAnimationFrame` then focus first link       |
+| Focus cannot escape        | Tab/Shift-Tab wrap at the boundaries                |
+| Focus returns on close     | `triggerRef.current?.focus()`                       |
 | Background does not scroll | `body.style.overflow = "hidden"`, restored on close |
 
 The `requestAnimationFrame` before focusing matters: the panel is animating in, and
@@ -643,8 +653,13 @@ focusing an element that is not yet laid out can fail or cause a scroll jump.
 #### `:focus-visible` vs `:focus`
 
 ```css
-:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
-:focus:not(:focus-visible) { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
 ```
 
 `:focus` matches on mouse clicks too, which is why people used to write `outline: none` and
@@ -695,13 +710,13 @@ await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
 
 #### The metrics and what they mean
 
-| Metric | What it is | Measured |
-|---|---|---|
-| **FCP** | First Contentful Paint — first pixel of content | ~1.6–1.9s @4× |
-| **LCP** | Largest Contentful Paint — main content visible | ~1.8–2.7s @4× |
-| **CLS** | Cumulative Layout Shift — how much content jumps | **0.0000** |
-| **Long Task** | Any main-thread task > 50ms; blocks input | 0 during scroll |
-| Frame time | Time between rendered frames; 16.7ms = 60fps | median **17ms** |
+| Metric        | What it is                                       | Measured        |
+| ------------- | ------------------------------------------------ | --------------- |
+| **FCP**       | First Contentful Paint — first pixel of content  | ~1.6–1.9s @4×   |
+| **LCP**       | Largest Contentful Paint — main content visible  | ~1.8–2.7s @4×   |
+| **CLS**       | Cumulative Layout Shift — how much content jumps | **0.0000**      |
+| **Long Task** | Any main-thread task > 50ms; blocks input        | 0 during scroll |
+| Frame time    | Time between rendered frames; 16.7ms = 60fps     | median **17ms** |
 
 CLS is exactly zero because of `next/font` metric overrides and because no images load
 above the fold.
@@ -723,7 +738,7 @@ stale chunk references.
 
 The habit this teaches, and a genuinely good thing to say in an interview: **validate that
 your measurement environment is sound before trusting any number, especially a number you
-were hoping for.** A result that confirms what you wanted deserves *more* scrutiny than one
+were hoping for.** A result that confirms what you wanted deserves _more_ scrutiny than one
 that does not.
 
 ---
@@ -761,7 +776,7 @@ should code-split it out of the main chunk.
 
 **Why:** importing `domAnimation` from the same `"motion/react"` entry point that the
 components come from defeats tree-shaking — the bundler pulls the whole package into the
-main chunk *anyway*, and then the dynamic import adds a second 30 KB copy.
+main chunk _anyway_, and then the dynamic import adds a second 30 KB copy.
 
 **Outcome:** reverted. The lesson is that bundle "optimisations" have to be measured; this
 one was plausible, widely recommended, and wrong here.
@@ -777,7 +792,7 @@ At 1024px the bus's hover labels overlapped the content. It needs the 240px gutt
 now appears at `xl` (1280px) and above. Found by looking at a screenshot, not by reasoning
 about it.
 
-### Changed: graph is *replaced* on mobile, not scaled
+### Changed: graph is _replaced_ on mobile, not scaled
 
 An 820-unit diagram squeezed into 375px is illegible, and an illegible diagram is
 decoration — precisely what the brief forbids. Below `md` the SVG is hidden and the node
@@ -857,7 +872,7 @@ Protocol. Assertions on computed style, not screenshots.
 
 **"Tell me about something you got wrong."**
 The `LazyMotion` bundle optimisation — plausible, commonly recommended, and it made the
-bundle 34 KB *larger*. And a profiling run that looked like a huge win turned out to be a
+bundle 34 KB _larger_. And a profiling run that looked like a huge win turned out to be a
 server returning 500 for every JS chunk. Both taught the same thing: measure, and be most
 suspicious of results you were hoping for.
 
@@ -876,7 +891,10 @@ module scope:
 
 ```ts
 const normalise = (tag: string) =>
-  tag.toLowerCase().replace(/\s*\(.*?\)\s*/g, "").trim();
+  tag
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, "")
+    .trim();
 ```
 
 Normalisation matters: `"Python (visualizer)"` and `"Python"` are the same technology for
@@ -915,7 +933,9 @@ The mechanism that makes this possible is the **children-as-slot** pattern:
 ```tsx
 // about.tsx is a Server Component
 <Fade className="max-w-prose space-y-4 text-silk-dim">
-  {ABOUT.map((para) => <p key={para}>{para}</p>)}
+  {ABOUT.map((para) => (
+    <p key={para}>{para}</p>
+  ))}
 </Fade>
 ```
 
@@ -953,9 +973,9 @@ section is current yet.
 
 This still runs inside an `IntersectionObserver` callback rather than a scroll listener.
 The observer fires only when a section edge crosses the viewport — a handful of times per
-page — and reading six rects at that moment costs nothing. The rule to remember: *an
+page — and reading six rects at that moment costs nothing. The rule to remember: _an
 IntersectionObserver is a cheap way to know **when** to measure; it is not always the right
-thing to measure.*
+thing to measure._
 
 #### The last-section problem
 
@@ -1017,9 +1037,20 @@ The stage-2 suite checked structure. The content stage added assertions about **
 which is unusual and worth mentioning in an interview:
 
 ```js
-const banned = ["passionate", "seamless", "cutting-edge", "revolutioniz",
-                "leverage", "lorem ipsum", "coming soon", "dive into"];
-check("no buzzwords or placeholder copy", banned.filter(w => body.includes(w)).length === 0);
+const banned = [
+  "passionate",
+  "seamless",
+  "cutting-edge",
+  "revolutioniz",
+  "leverage",
+  "lorem ipsum",
+  "coming soon",
+  "dive into",
+];
+check(
+  "no buzzwords or placeholder copy",
+  banned.filter((w) => body.includes(w)).length === 0,
+);
 ```
 
 Plus: no `href="#"` or empty links anywhere; every external link carries
@@ -1092,6 +1123,7 @@ the escape hatch leaves a record of what was traded and why.
 intentional; then a design brief, no code.
 
 **Done:**
+
 - Researched AI-generated design tells and developer-portfolio critique; reviewed
   `rauno.me` and `brittanychiang.com` as reference points.
 - Wrote `DESIGN_BRIEF.md`: the user's 13 anti-patterns as a floor, plus ~35 more from
@@ -1115,6 +1147,7 @@ intentional; then a design brief, no code.
 footer. No content sections.
 
 **Done:**
+
 - Scaffolded Next 16 + TS + Tailwind 4 + `motion` + ESLint/Prettier. (`create-next-app`
   rejected the directory name `Portfolio` because npm forbids capitals in package names, so
   it was scaffolded elsewhere and moved in.)
@@ -1146,6 +1179,7 @@ experience section.
 embellish nothing, no buzzwords.
 
 **Done:**
+
 - Added `src/data/projects.ts` and `src/data/profile.ts` as the content layer, so copy lives
   in typed data rather than scattered through JSX.
 - Built seven sections — hero, about + education, skills, six projects, experience,
@@ -1164,6 +1198,7 @@ embellish nothing, no buzzwords.
 - Expanded the test suite to 26 assertions including buzzword and placeholder checks (2.14).
 
 **Bugs found and fixed, all by measuring rather than assuming:**
+
 1. Every section heading was invisible — Motion silently refuses to animate `clipPath` (2.13).
 2. Heading rules fired intermittently — fractional viewport threshold on a 1px element (2.13).
 3. The nav highlighted the wrong section — `intersectionRatio` is meaningless for a
@@ -1189,13 +1224,14 @@ written. Worth confirming.
 Projects/Skills order.
 
 **Done:**
+
 - **New BridgeAid image.** The replacement is a real product screenshot — the Live Disaster
   Map, Leaflet over the Hamilton region, captioned "Showing 2 confirmed incident(s)" — in
   place of a promotional title card. It is also a different file entirely: `.png` not
   `.jpg`, and 1908×814 not 1280×720, so the `src`, `width`, `height` and alt text all had
   to change. Stale dimensions on a `next/image` do not error; they silently produce the
   wrong aspect-ratio box and reintroduce layout shift.
-- **Team note written.** The four names came from the *previous* image, which had since
+- **Team note written.** The four names came from the _previous_ image, which had since
   been replaced — so they were recovered from an earlier screenshot by rendering it
   magnified in a browser and reading it back, rather than reconstructed from memory. Worth
   the two minutes: a misspelled teammate's name on a live portfolio is not a small error.
@@ -1217,11 +1253,12 @@ documented-exception pattern for design tokens.
 **Asked for:** fix the format and aspect-ratio problems across all project images.
 
 **Done:**
+
 - **Format.** All three converted to WebP with `sharp`: **1.32 MB to 186 KB**. The BridgeAid
   screenshot alone went 1208 KB to 75 KB, because a photographic map screenshot was being
   stored as a 4-channel PNG. The CAD drawing was encoded at q94 rather than losslessly —
   lossless WebP of an already-JPEG source re-encodes the JPEG's own artifacts and came out
-  *larger* than the original (134 KB vs 58 KB), which is a good reminder that "lossless"
+  _larger_ than the original (134 KB vs 58 KB), which is a good reminder that "lossless"
   is not a synonym for "better".
 - **Aspect ratio.** The three sources run 1:1, 1.30:1 and 2.34:1, so at natural proportions
   the project entries read as wildly uneven blocks. They now share one 3:2 frame with
@@ -1259,10 +1296,11 @@ as an editorial decision, `naturalWidth` under `srcset` density.
 **Why it mattered.** The WireFish image was generated key art — a glowing neon-blue fish on
 a dark circuit background. It was the single thing on the site that looked machine-made, and
 it sat on the anti-pattern list twice over: neon-on-dark with glows (§1b) and decoration with
-no relationship to the work (§1 item 11). It was also a *logo*, not evidence — it showed
+no relationship to the work (§1 item 11). It was also a _logo_, not evidence — it showed
 that someone had made a logo, not that the tool existed.
 
 **Done:**
+
 - Built `visuals/terminal.tsx`: the three real CLI invocations with a copper prompt, each
   annotated with one sourced line, under a header strip carrying the three output modes.
 - Deleted `public/images/wirefish-1.webp`.
@@ -1310,7 +1348,7 @@ judged is included in the window used to judge it, it drags the mean toward
 itself and inflates the standard deviation, which shrinks its own score — the
 bigger the outlier, the better it hides. Measured in the test suite: a true
 4.00σ spike scores **3.18σ** if it is allowed into its own baseline. So the
-baseline is always the window of points *preceding* the one under test.
+baseline is always the window of points _preceding_ the one under test.
 
 **Sample, not population, standard deviation.** The `n-1` denominator (Bessel's
 correction) is right here because the window is a sample of an ongoing process,
@@ -1321,7 +1359,7 @@ enough to move a borderline point across a 2.5 threshold.
 well-known trick for maintaining a running variance by adding the new term and
 subtracting the old one. It is faster and it is a trap: repeatedly adding and
 subtracting floating-point terms accumulates error, and the running sum of
-squares can drift *negative*, at which point `Math.sqrt` returns `NaN` and every
+squares can drift _negative_, at which point `Math.sqrt` returns `NaN` and every
 downstream z-score is silently broken. At a window of 30, recomputation is
 thirty additions — free — so correctness wins. Knowing why you did not use the
 clever version is worth more than using it.
@@ -1359,7 +1397,7 @@ stop changing.
 
 **Reduced motion slows rather than stops.** Elsewhere on this site
 `prefers-reduced-motion` disables animation outright, because the animation is
-decoration. Here the numbers *are* the content, so freezing them would remove
+decoration. Here the numbers _are_ the content, so freezing them would remove
 the point of the widget. The tick slows from 1s to 4s and the pulse is dropped.
 The distinction worth carrying: reduce motion, not information.
 
@@ -1400,8 +1438,8 @@ let lastGroup = null;
 results.map((c) => { const show = c.group !== lastGroup; lastGroup = c.group; ... })
 ```
 
-`react-hooks/immutability` rejects this: *"Cannot reassign variable after render
-completes."* Reassigning across a render pass assumes the list renders exactly
+`react-hooks/immutability` rejects this: _"Cannot reassign variable after render
+completes."_ Reassigning across a render pass assumes the list renders exactly
 once, in order, start to finish — which React does not promise. The grouping is
 now computed in the `useMemo` that produces the results, as data.
 
@@ -1416,7 +1454,7 @@ failure was a bug in the site:
    negation near each match instead, which survives rephrasing.
 2. To read copy inside collapsed `<details>`, the check force-opened every
    disclosure on the page — and left them open, so a later assertion that
-   disclosures are *collapsed by default* failed. Shared page state between
+   disclosures are _collapsed by default_ failed. Shared page state between
    assertions is the test-suite equivalent of a global variable.
 
 The habit: when a test starts failing right after you add a different test,
@@ -1425,10 +1463,11 @@ suspect the new test before the code.
 ### 2026-09-22 — Stage 7: Live Signal and command palette
 
 **Asked for:** one memorable feature demonstrating real logic tied to TradeWatch —
-explicitly *not* a terminal boot sequence, since two of the three reference
+explicitly _not_ a terminal boot sequence, since two of the three reference
 portfolios already open with one — plus a Cmd/Ctrl+K command palette.
 
 **Done:**
+
 - `src/lib/signal.ts` — seeded PRNG, Box–Muller gaussian, Ornstein–Uhlenbeck
   series with shocks, rolling mean/sd, z-score classification. Pure, no React.
 - `src/lib/signal.test.ts` — 16 tests under Node's built-in runner (`npm test`),
@@ -1507,13 +1546,13 @@ worth knowing before "fixing" it.
 
 **Performance — production build at 4× CPU throttling.**
 
-| | |
-|---|---|
-| Transfer | 199.5 KB JS, 7.2 KB CSS, 59.8 KB fonts, 266.5 KB total, 12 requests |
-| LCP | 792 ms |
-| CLS | **0.0000** |
-| 6s with Live Signal ticking | median **16.7 ms (60fps)**, p95 19.2 ms, **0 long tasks** |
-| Full-page scroll | median 16.9 ms (59fps), 1 frame over 50 ms |
+|                             |                                                                     |
+| --------------------------- | ------------------------------------------------------------------- |
+| Transfer                    | 199.5 KB JS, 7.2 KB CSS, 59.8 KB fonts, 266.5 KB total, 12 requests |
+| LCP                         | 792 ms                                                              |
+| CLS                         | **0.0000**                                                          |
+| 6s with Live Signal ticking | median **16.7 ms (60fps)**, p95 19.2 ms, **0 long tasks**           |
+| Full-page scroll            | median 16.9 ms (59fps), 1 frame over 50 ms                          |
 
 **Lazy work below the fold.** The Live Signal previously started ticking on
 hydration and ran while the visitor was still reading the hero — statistics and
@@ -1558,8 +1597,8 @@ the derivation became one generic function run twice over two indexes (tag to
 projects, person to projects). A pair can hold both kinds, and then both are
 drawn. Stack edges stay solid and straight. Teammate edges are dashed and
 curved, like a jumper wire on a circuit board, with a key under the diagram
-saying which is which. Interview angle: *encoding different semantics with
-different visual channels*. If one line style meant two things, the diagram
+saying which is which. Interview angle: _encoding different semantics with
+different visual channels_. If one line style meant two things, the diagram
 would be making a claim the data does not support.
 
 One consequence nobody asked for: Adib El Dada is on both BridgeAid and Catan, so
@@ -1578,7 +1617,7 @@ after the solid ones have drawn.
 **Curves that avoid bystanders.** Triage Flow to Catan as a straight line passed
 about 10 units from the BridgeAid node, so it looked like BridgeAid was
 involved. Each teammate edge is a quadratic Bézier whose control point is offset
-perpendicular to the line, *away* from the nearest other node. Finding that
+perpendicular to the line, _away_ from the nearest other node. Finding that
 node takes two formulas: the projection `t = (p−a)·(b−a) / |b−a|²` (is the node
 alongside the segment at all?) and the perpendicular distance `(p−a)·n` (which
 side is it on, and how close?). It is deterministic, so it gives the same path
@@ -1586,7 +1625,7 @@ on every render.
 
 **Why nobody noticed the heading animation.** A trace rule already drew in
 under every heading, but it fired at intersection threshold 0 on a 1px element,
-the instant one pixel crossed the *bottom* of the viewport, and ran for 240ms.
+the instant one pixel crossed the _bottom_ of the viewport, and ran for 240ms.
 It had finished before anyone looked there. The fix is a shrunken root:
 `useInView(ref, { once: true, margin: "0px 0px -15% 0px" })` fires only once the
 heading is clearly on screen. The new sequence is a pad lighting, the trace
@@ -1600,7 +1639,7 @@ Two robustness details worth knowing:
   state". That is how reduced motion gets a finished frame with no tween.
 - Entrance animations server-render their hidden starting styles inline, and
   only JavaScript clears them. A `<noscript><style>[data-reveal]{opacity:1
-  !important;transform:none!important}</style></noscript>` in the head means
+!important;transform:none!important}</style></noscript>` in the head means
   that with JS off the page shows content instead of blank space.
 
 **A testing trap: headless screenshots lie about scroll-triggered things.** A
@@ -1615,7 +1654,7 @@ one tests the harness, not the page.
 **Why a square image looked twice as big.** Every project image sits in the
 same 3:2 `object-contain` frame. A 2.34:1 screenshot fills a strip of that
 frame (~355px tall), but a 1.3:1 drawing fills almost all of it (~555px). Same
-frame, very different *visible* size. Equal containers don't give equal visual
+frame, very different _visible_ size. Equal containers don't give equal visual
 weight; what the eye compares is the visible content. The fix gives that image a
 narrower frame so its visible height (~340px) matches.
 
@@ -1658,14 +1697,14 @@ recorded as an amendment in DESIGN_BRIEF.md §2.7 so the contract stays true.
 **3D without a 3D library.** Six nodes don't justify three.js. The whole
 pipeline is three ideas:
 
-1. *Model space.* Each project has a committed `(x, y, z)`. Nodes are centred
+1. _Model space._ Each project has a committed `(x, y, z)`. Nodes are centred
    on their centroid so rotation happens in place. The object is rigid; only
    the viewing angle changes.
-2. *Rotation matrix.* Orientation is one 3×3 matrix `R`. Each frame, a small
+2. _Rotation matrix._ Orientation is one 3×3 matrix `R`. Each frame, a small
    rotation is multiplied in: `R ← step · R`. `step` comes from **Rodrigues'
    formula** (axis + angle → matrix). Left-multiplying applies the rotation in
-   *screen* space, which is what makes dragging feel right.
-3. *Perspective projection.* A point at depth `z` with the camera `D` away
+   _screen_ space, which is what makes dragging feel right.
+3. _Perspective projection._ A point at depth `z` with the camera `D` away
    lands at `(x, y) · D / (D − z)`. That scale factor also drives the depth
    cues: nearer nodes are bigger, brighter and drawn later (the **painter's
    algorithm**).
@@ -1680,7 +1719,7 @@ Worth knowing for interviews:
   asserts `det = 1` and preserved lengths.
 - **Trackball drag.** A drag of `(dx, dy)` becomes a rotation about the
   screen-plane axis `(−dy, dx, 0)` by an angle proportional to the distance.
-  Signs are the classic bug, especially because SVG and canvas y points *down*.
+  Signs are the classic bug, especially because SVG and canvas y points _down_.
   The tests pin the behaviour: dragging right moves the front of the object
   right.
 - **Non-repeating ambient motion without randomness.** The rotation axis
@@ -1703,42 +1742,42 @@ draw calls with no style, no layout and no DOM. Result: the graph's frames
 became indistinguishable from an idle page. What SVG gave for free had to be
 rebuilt:
 
-- *Hit-testing:* find the nearest projected node within 18 units, preferring
+- _Hit-testing:_ find the nearest projected node within 18 units, preferring
   the front one.
-- *The hover packet:* a short span stroked along the edge, sampled from the
+- _The hover packet:_ a short span stroked along the edge, sampled from the
   quadratic Bézier `(1−s)²A + 2(1−s)sC + s²B`.
-- *The one-time edge draw-in.*
-- *Theme colours:* canvas can't read CSS variables live, so a
+- _The one-time edge draw-in._
+- _Theme colours:_ canvas can't read CSS variables live, so a
   MutationObserver re-reads them when `data-theme` changes.
-- *Crisp lines:* the backing store is sized to `cssWidth × devicePixelRatio`.
+- _Crisp lines:_ the backing store is sized to `cssWidth × devicePixelRatio`.
 
-**Separating ownership.** React owns *interaction state* (hovered node,
-filter). The animation loop owns *orientation and drawing*. They meet through
+**Separating ownership.** React owns _interaction state_ (hovered node,
+filter). The animation loop owns _orientation and drawing_. They meet through
 refs, so hovering re-renders the legend but never the loop, and 60 frames a
 second never touch React.
 
 **Ambient backdrop, CSS only.** A 240px SVG tile of traces is used as a
 **mask** rather than a background image. An SVG inside a `data:` URL can't
-read the page's CSS variables, but the colour *behind* a mask can, so the
+read the page's CSS variables, but the colour _behind_ a mask can, so the
 backdrop follows the theme for free. The layer is oversized by one tile and
-drifts exactly one tile, so the loop is seamless. The pulses live *inside* the
+drifts exactly one tile, so the loop is seamless. The pulses live _inside_ the
 masked layer, so the mask trims them to the trace: the trace itself lights up.
 Irregular timing without JS: two elements share one 120s keyframe timeline
 with pulses at hand-picked offsets (gaps of 20, 25, 20, 29 and 25s).
 
 Paint-order detail: the backdrop is `z-index: -1`, and the body's background
-had to go. Negative z-index layers paint *above* the root background but
-*below* in-flow block backgrounds, so a background on `<body>` would cover
+had to go. Negative z-index layers paint _above_ the root background but
+_below_ in-flow block backgrounds, so a background on `<body>` would cover
 them.
 
-**Measurement caveat worth being honest about.** In headless Chrome, *any*
+**Measurement caveat worth being honest about.** In headless Chrome, _any_
 CSS transform animation (tested with a bare 200px square) caused per-frame
 main-thread style recalcs. That's the harness lacking real GPU compositing.
 Numbers should always say what environment produced them.
 
 **A self-inflicted build break, and its lesson.** A test-script `sed` used `#`
 as its delimiter, and a `#work` selector in the replacement parsed as sed's
-`w` flag, *writing a file to disk* named after the rest of the expression.
+`w` flag, _writing a file to disk_ named after the rest of the expression.
 Tailwind's source scanner then took that filename's garbage "extension" as a
 glob and Turbopack panicked. Worse, the panic survived deleting the file,
 because Turbopack's persistent cache remembered it. Lessons: choose sed
@@ -1766,7 +1805,7 @@ the DevTools Protocol (`Page.addScriptToEvaluateOnNewDocument` stamping the
 attributes before hydration): the exact error appears without the fix and
 disappears with it. A first attempt at the simulation used a MutationObserver
 on `document.documentElement` and failed, because that script runs before
-`<html>` exists. Injected scripts run *very* early.
+`<html>` exists. Injected scripts run _very_ early.
 
 **Live Signal: presentation, not logic.** The series is shown as a price by
 adding a constant 100. Standard deviation and z-score are **invariant under a
@@ -1778,7 +1817,7 @@ SVG uses `preserveAspectRatio="none"`, which would stretch SVG text.
 
 **Typing terminal without a hydration mismatch.** The server renders the
 finished transcript (full content without JS). The animation needs the client
-to render something *different*, a partial transcript, without tripping React.
+to render something _different_, a partial transcript, without tripping React.
 `useSyncExternalStore(subscribe, () => true, () => false)` returns the server
 snapshot (`false`) during hydration and `true` afterwards. It's the sanctioned
 "am I hydrated?" check, and it replaced a setState-in-effect that React 19's
@@ -1830,7 +1869,7 @@ because the script never runs.
 **Reusing real logic instead of scripting a demo.** The intro's spike is the
 real detector's first flag on a seeded stream. I searched seeds for one whose
 first anomaly (with |z| ≥ 3) lands on tick 16–20; seed 182 flags on tick 19 at
-z ≈ 6.8. "Searched for a seed" is worth saying out loud: the *timing* was
+z ≈ 6.8. "Searched for a seed" is worth saying out loud: the _timing_ was
 chosen, but the flag itself is the detector's own decision, which is exactly
 what the Live Signal widget later shows.
 
@@ -1860,7 +1899,7 @@ frame times up under 4× CPU throttling. The fix is a **sprite**: render the
 gradient once into an offscreen canvas and `drawImage` it with
 `globalAlpha`, a blit instead of a rasterisation. It's rebuilt only when the
 colour changes (theme switch). Worth knowing that the measurements were noisy
-(the same state varied 6–12ms at p95); the evidence was the *trend* across
+(the same state varied 6–12ms at p95); the evidence was the _trend_ across
 repeated runs, not one number.
 
 **Not fabricating a data edge.** A request to add a "shared collaborator"
@@ -1882,7 +1921,7 @@ benchmarks.
 second.** The visible symptom was text not lining up with the media above
 it. The first cause was obvious: media used a wider `figure` width (52rem)
 while text used `max-w-prose`, two different widths in one column. After
-unifying them, a *script* measuring every block's pixel edges (not
+unifying them, a _script_ measuring every block's pixel edges (not
 screenshots) still found one block per entry ending 125px short: the team
 line, which is in the smaller `text-micro` size.
 
@@ -1914,7 +1953,7 @@ written out in full.
 
 **Skills as a real second index, derived, not mapped.** A skill "is used in" a
 project when any `/`-separated part of its name matches one of the project's
-stack tags, using the *same normaliser the graph uses for edges*. No
+stack tags, using the _same normaliser the graph uses for edges_. No
 hand-maintained mapping means no drift, and no inferred links: "Continuous
 Integration" isn't tied to TradeWatch, because no stack tag says so. A derived
 group ("Also in the projects") lists stack technologies the supplied skills
@@ -2019,7 +2058,7 @@ labels would render at ~5.6px and the 18-unit tap radius at ~8px. Removing
 untappable diagram.
 
 **Fix:** show it at every width, and floor the things that must not scale
-in *screen* pixels: labels ≥11px, tap radius ≥22px. Geometry still scales;
+in _screen_ pixels: labels ≥11px, tap radius ≥22px. Geometry still scales;
 text and touch targets don't shrink below usable. A label that would then
 run off the right edge flips to the left of its node.
 
@@ -2072,3 +2111,57 @@ The contact email changed to a career-specific address. A one-line edit in
 `src/config/site.ts`, because every mailto link and the visible address in
 Contact read from `CONTACT.email`. That's the payoff of one config file for
 identity: a change in one place can't leave a stale copy elsewhere.
+
+### 2026-10-21 — Stage 15: recruiter pass
+
+Contact form, an offline "Ask about me" assistant, a playable backtest, macOS
+terminal frames, 44px touch targets, and a TradeWatch content correction.
+
+- **A demo should run the project's real logic.** Live Signal now uses
+  TradeWatch's actual detector (median and MAD over the last 60 moves,
+  threshold 3.5) instead of a mean and standard deviation the repo never
+  used. The backtest demo is a line-for-line port of `sma_crossover.py` and
+  the backtest engine, and its tests mirror the repo's: no lookahead, fills
+  at the next bar's open, open trades never force-closed.
+- **Retrieval, not generation, for a portfolio chatbot.** BM25 over a
+  knowledge base written from the site's own data can't invent a fact, can't
+  be rate-limited and costs nothing. The hard part is refusing: a question
+  that matches only generic words ("does he know Rust?") must say "I don't
+  know", not answer with the skills list.
+- **The server can't know `prefers-reduced-motion`.** Two components chose
+  text or an element from `useReducedMotion()` during render, which differs
+  between server and client and caused hydration errors only for visitors
+  with reduced motion on. Render both and choose in CSS instead.
+- **Focus can't move to a hidden element.** Returning focus to the launcher
+  had to wait for the re-render that made it visible again.
+- **A form that can fail must not lose what was typed.** Every failure ends
+  in a mailto link prefilled with the message.
+
+**Concepts introduced:** BM25 and refusal thresholds; robust statistics
+(median, MAD); lookahead bias in backtests; hydration mismatches.
+
+### 2026-10-21 — Stage 16: playable demos and motion
+
+Every project got a demo you drive rather than watch, the layout went full
+width, and the site gained a light layer of pointer-driven motion.
+
+- **Port the rule, simulate the world.** Each demo's logic is a small pure
+  module with tests (triage levels and queue order, BridgeAid's report
+  verification, WireFish's argument parser, the Catan AI's turn, TradeWatch's
+  consumer groups). Only the inputs are made up, and each caption says which
+  part is which.
+- **Show a different angle from a teammate's site.** Adib already demos three
+  of the same projects, so these show other sides: playing the patient,
+  trying to break the verification rule, typing real CLI flags.
+- **Write CSS variables, not React state, for pointer effects.** One
+  listener sets `--gx/--gy` on the hovered panel; the browser does the rest.
+  Nothing re-renders as the mouse moves.
+- **`setState` inside an effect is a smell.** The lint rule caught an
+  auto-play loop stopping itself from an effect; the fix was to stop it in
+  the same handler that computes the final step.
+- **A 1px effect is invisible in a 1x screenshot.** The edge glow worked all
+  along; checking it needed a 4x capture. A faint inner wash makes it read at
+  normal size too.
+
+**Concepts introduced:** Kafka consumer groups and offsets; the Template
+Method and Visitor patterns as runnable steps; CSS mask compositing.

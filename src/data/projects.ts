@@ -49,9 +49,7 @@ export type Project = {
   links: readonly ProjectLink[];
   image?: ProjectImage;
   /** An abstract visual or small demo built from the project's own concept, not a stock image. */
-  visual?: "pipeline" | "terminal" | "bridgeaid-map" | "hex-board";
-  /** Renders the Live Signal widget beneath the visual. TradeWatch only. */
-  liveSignal?: true;
+  visual?: "tradewatch" | "terminal" | "bridgeaid-map" | "triage" | "catan";
   /** Rendered plainly where the work was not solo. */
   team?: string;
   /**
@@ -86,22 +84,25 @@ export const PROJECTS: readonly Project[] = [
     tagline: "Market Intelligence & Paper-Trading Platform",
     status: {
       label: "In progress",
-      detail: "Phase 3 of 12 complete",
+      detail: "Phase 10 of 12 complete",
     },
     description: [
-      "TradeWatch watches live market data and tries to notice when something is behaving strangely compared to how it normally does. Prices and trades stream in continuously, so the system has to keep up in real time rather than analyzing things after the fact.",
-      "Under the hood, market data flows through Kafka to two separate processes that both read the same stream: one stores every trade exactly as it came in, and the other builds it into one minute, five minute, hourly, and daily candles. Kafka only guarantees a message will arrive at least once, so both processes are written so that receiving the same trade twice never corrupts the data.",
-      "Rather than jumping straight into building trading strategies, most of the work so far has gone into making sure the plumbing underneath is actually trustworthy: the pipeline, the database writes, the CI checks. Right now the project is on phase 3 of 12, and there is no strategy engine or machine learning yet, on purpose. A trading strategy built on top of a shaky pipeline is worse than no strategy at all. The anomaly detector, once it's live, will only ever flag activity that looks unusual for that specific stock compared to its own history. It is not trying to catch fraud or market manipulation, and the project is careful not to claim that it does.",
+      "TradeWatch watches live market data and notices when a stock starts behaving unusually compared to its own recent history. Around that sits a full paper-trading platform: write a trading strategy, backtest it against stored history, then run it against the live feed with simulated money, all from one React dashboard.",
+      "Under the hood, market data flows into Kafka and fans out to independent processes that each read the same stream at their own pace. One stores every trade, one builds one minute candles and rolls them up to five minute, hourly and daily ones, one pushes live prices to the browser, one runs the paper-trading strategies, and one scores every closed candle for unusual activity and hands anything it flags to an alert service. Kafka only promises that a message arrives at least once, so every one of those writes is idempotent: receiving the same trade twice never changes the result.",
+      "Most of the effort went into making that plumbing trustworthy before building on top of it, which is why the project was built in phases with the pipeline, storage and CI first and strategies and detection after. Ten of the twelve phases are done; what remains is end-to-end failure-recovery testing and cloud deployment. The anomaly detector only ever flags activity that is unusual for a specific stock compared to its own history. It does not try to catch fraud or market manipulation, and the project is careful never to claim that it does.",
     ],
     details: [
-      "Real-time pipeline: a market data provider feeds Kafka, which fans out to two independent consumer groups — one storing raw trades in PostgreSQL, one aggregating into 1-minute bars with 5m/1h/1d rollups.",
+      "Real-time pipeline: a market data provider feeds Kafka, which fans out to six independent consumer groups: raw trade storage, candle aggregation (1-minute bars with 5m/1h/1d rollups), live broadcast through Redis to WebSockets, paper trading, anomaly detection, and alert dispatch.",
       "At-least-once delivery with idempotent writes; offsets are only committed after data is durably stored.",
-      "Over 30 days of real historical backfill, aggregated into multi-timeframe bars.",
-      "Statistical anomaly detection flags market activity that is unusual relative to a symbol's own recent behaviour — explicitly not a claim of fraud or manipulation detection.",
+      "Strategies are configuration run by one shared execution core, so a backtest and a live paper-trading run use the same decision code.",
+      "Anomaly detection: a rolling median and median-absolute-deviation z-score over each symbol's own recent candles, across return, volatility, volume and trade count. An Isolation Forest model can replace it only if offline evaluation shows it does at least as well. Flags unusual activity, explicitly not fraud or manipulation.",
       "Simulates trading only: no brokerage connectivity, no real money moves.",
+      "Accounts with JWT authentication; every strategy, backtest and portfolio is scoped to its owner.",
+      "Prometheus metrics on every process and a committed Grafana dashboard.",
+      "Benchmarked on one laptop with everything running locally: 750 trade events per second sustained into PostgreSQL, and a median of 37 ms from the data provider to the browser. Single-machine figures, not production ones.",
       "Layered architecture (domain / application / infrastructure) enforced by import-linter in CI.",
       "Typed settings that fail startup with every missing config variable named at once.",
-      "Five independent CI jobs: lint and type-check, unit and API tests, integration tests against real Postgres, a startup check, and the frontend.",
+      "Six independent CI jobs: lint and type-check, unit and API tests, integration tests against real PostgreSQL, Redis and Kafka, a startup check, the frontend, and a Docker build.",
       "No performance number appears anywhere in the project unless a benchmark produced it.",
     ],
     stack: [
@@ -111,9 +112,14 @@ export const PROJECTS: readonly Project[] = [
       "PostgreSQL",
       "Redis",
       "Alembic",
+      "scikit-learn",
       "React",
       "TypeScript",
       "Vite",
+      "Recharts",
+      "WebSockets",
+      "Prometheus",
+      "Grafana",
       "Docker",
       "GitHub Actions",
     ],
@@ -126,8 +132,7 @@ export const PROJECTS: readonly Project[] = [
           "TradeWatch on GitHub — private repository, not publicly accessible",
       },
     ],
-    visual: "pipeline",
-    liveSignal: true,
+    visual: "tradewatch",
     node: { x: 340, y: 120, z: -190 },
   },
 
@@ -161,10 +166,9 @@ export const PROJECTS: readonly Project[] = [
         a11yLabel: "Triage Flow live demo, opens in a new tab",
       },
     ],
-    collaborators: ["Youssef Khafagy"],
-    // On Triage Flow only, so an annotation on its node rather than an edge.
-    graphNote: "with Subhan Razzaq",
+    team: "Team project.",
     node: { x: 600, y: 100, z: -30 },
+    visual: "triage",
   },
 
   {
@@ -208,8 +212,7 @@ export const PROJECTS: readonly Project[] = [
     // An interactive map demo in place of the screenshot, since BridgeAid is
     // not deployed. The screenshot file stays in public/images unused.
     visual: "bridgeaid-map",
-    team: "Team of 4: Youssef Elshafei, Adib El Dada, Ahmed Elmanufi, Youssef Elsayyad.",
-    collaborators: ["Adib El Dada", "Ahmed Elmanufi", "Youssef Elsayyad"],
+    team: "Team project.",
     node: { x: 330, y: 255, z: 40 },
   },
 
@@ -230,7 +233,18 @@ export const PROJECTS: readonly Project[] = [
       "Linux requires elevated privileges to open a raw socket at all.",
       "MIT licensed.",
     ],
-    stack: ["C", "Linux", "Raw Sockets", "ICMP", "POSIX", "Make"],
+    // GitHub Actions is real: the repo's workflow builds the binary and runs
+    // its test script on every push. It is also what keeps WireFish from
+    // being an isolated node now that the graph has no teammate edges.
+    stack: [
+      "C",
+      "Linux",
+      "Raw Sockets",
+      "ICMP",
+      "POSIX",
+      "Make",
+      "GitHub Actions",
+    ],
     links: [
       {
         kind: "repo",
@@ -240,10 +254,7 @@ export const PROJECTS: readonly Project[] = [
       },
     ],
     visual: "terminal",
-    team: "Built collaboratively in a Git-based team workflow with 3 teammates.",
-    // Only the one teammate named in the source material. The other two are
-    // not named anywhere, so they cannot produce an edge.
-    collaborators: ["Youssef Khafagy"],
+    team: "Team project, built in a Git-based workflow with three teammates.",
     node: { x: 120, y: 70, z: 170 },
   },
 
@@ -273,9 +284,8 @@ export const PROJECTS: readonly Project[] = [
           "Catan Simulator on GitHub, hosted under teammate Adib El Dada's account",
       },
     ],
-    visual: "hex-board",
-    team: "Team of 4: Adib El Dada, Youssef Elshafei, Youssef Khafagy, Riken Allen. The repository is hosted under a teammate's account.",
-    collaborators: ["Adib El Dada", "Youssef Khafagy", "Riken Allen"],
+    visual: "catan",
+    team: "Team project. The repository is hosted under a teammate's account.",
     node: { x: 140, y: 345, z: 190 },
   },
 ];

@@ -85,7 +85,7 @@ export function MobileNav() {
         aria-label="Open navigation"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk lg:hidden"
+        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk lg:hidden"
       >
         <Menu aria-hidden="true" className="size-4" strokeWidth={1.75} />
       </button>
@@ -128,7 +128,7 @@ export function MobileNav() {
                   type="button"
                   onClick={close}
                   aria-label="Close navigation"
-                  className="inline-flex size-9 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk"
+                  className="inline-flex size-11 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-dim hover:border-edge hover:text-silk"
                 >
                   <X aria-hidden="true" className="size-4" strokeWidth={1.75} />
                 </button>

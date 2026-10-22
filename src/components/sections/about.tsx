@@ -23,7 +23,7 @@ import { SITE } from "@/config/site";
 export function About() {
   return (
     <Section id="about" ref_="01" title="About" className="pb-28">
-      <div className="max-w-column rounded-trace border border-copper-spent bg-surface">
+      <div className="rounded-trace border border-copper-spent bg-surface">
         <div className="border-b border-hairline px-6 py-6 sm:px-8">
           <p className="text-h3">{SITE.name}</p>
           <p className="mt-1 text-silk-dim">{SITE.role}</p>
@@ -82,9 +82,7 @@ export function About() {
                         )}
                       </p>
                       {"detail" in r && (
-                        <p className="text-micro text-silk-faint">
-                          {r.detail}
-                        </p>
+                        <p className="text-micro text-silk-faint">{r.detail}</p>
                       )}
                     </li>
                   ))}

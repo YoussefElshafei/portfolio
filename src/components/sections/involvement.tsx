@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { Stagger } from "@/components/motion/reveal";
 import { Section } from "@/components/sections/section";
 import {
   CERTIFICATIONS,
@@ -127,15 +129,24 @@ function Entry({
           {entry.period}
         </p>
       )}
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="text-silk">{entry.title}</h3>
-        {/* A category tag is a status string, so mono (§2.6). */}
-        <span className="rounded-trace border border-copper/40 px-1.5 font-mono text-micro text-copper">
-          {entry.kind}
-        </span>
+      {/* The entry is a quiet card: invisible at rest, it lifts and lights
+          under the pointer. Margins cancel its padding so the text stays
+          aligned with the trace marker. */}
+      <div
+        data-glow
+        data-tilt
+        className="glow lift -mx-3 -mt-2 rounded-trace border border-transparent px-3 py-2 hover:border-hairline hover:bg-surface"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="text-silk">{entry.title}</h3>
+          {/* A category tag is a status string, so mono (§2.6). */}
+          <span className="rounded-trace border border-copper/40 px-1.5 font-mono text-micro text-copper">
+            {entry.kind}
+          </span>
+        </div>
+        <p className="mt-1 text-micro text-silk-faint">{entry.role}</p>
+        <p className="mt-2 text-silk-dim">{entry.description}</p>
       </div>
-      <p className="mt-1 text-micro text-silk-faint">{entry.org}</p>
-      <p className="mt-2 text-silk-dim">{entry.description}</p>
     </li>
   );
 }
@@ -148,10 +159,10 @@ export function Involvement() {
 
   return (
     <Section id="involvement" ref_="04" title="Involvement" className="pb-28">
-      <ol className="max-w-column">
+      <ol>
         {entries.map((entry, i) => (
           <Entry
-            key={entry.org + entry.title}
+            key={entry.title}
             entry={entry}
             first={i === 0}
             last={i === entries.length - 1}
@@ -164,13 +175,19 @@ export function Involvement() {
         ))}
       </ol>
 
-      <div className="mt-14 max-w-column">
+      <div className="mt-14">
         <h3 className="mb-5 text-micro font-medium text-silk-dim">
           Certifications
         </h3>
-        <ul className="divide-y divide-hairline border-y border-hairline">
-          {CERTIFICATIONS.map((cert) => (
-            <li key={cert.name} className="py-4">
+        <Stagger as="ul" className="grid gap-4 md:grid-cols-2">
+          {CERTIFICATIONS.map((cert, i) => (
+            <li
+              key={cert.name}
+              data-glow
+              data-tilt
+              style={{ "--i": i } as CSSProperties}
+              className="glow lift rounded-trace border border-hairline bg-surface p-4 hover:border-edge"
+            >
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <p className="text-silk">{cert.name}</p>
                 {/* Issue date is a machine fact -> mono (§2.6). */}
@@ -184,7 +201,7 @@ export function Involvement() {
               )}
             </li>
           ))}
-        </ul>
+        </Stagger>
       </div>
     </Section>
   );

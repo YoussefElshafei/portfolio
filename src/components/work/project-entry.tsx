@@ -1,10 +1,10 @@
 import Image from "next/image";
 import type { Project, ProjectLink } from "@/data/projects";
-import { PipelineDiagram } from "@/components/visuals/pipeline";
+import { TradeWatchDemo } from "@/components/visuals/tradewatch-demo";
 import { TerminalBlock } from "@/components/visuals/terminal";
 import { BridgeAidDemo } from "@/components/visuals/bridgeaid-demo";
-import { HexBoard } from "@/components/visuals/hex-board";
-import { LiveSignal } from "@/components/visuals/live-signal";
+import { TriageDemo } from "@/components/visuals/triage-demo";
+import { CatanDemo } from "@/components/visuals/catan-demo";
 import { Fade } from "@/components/motion/reveal";
 
 function ArrowOut() {
@@ -29,7 +29,7 @@ function LinkButton({ link }: { link: ProjectLink }) {
       target="_blank"
       rel="noreferrer noopener"
       aria-label={link.a11yLabel ?? link.label}
-      className="inline-flex items-center gap-2 rounded-trace border border-hairline px-3 py-1.5 text-micro text-silk-dim hover:border-edge hover:text-copper"
+      className="inline-flex items-center gap-2 rounded-trace border border-hairline px-3 py-1.5 text-micro text-silk-dim hover:border-edge hover:text-copper pointer-coarse:min-h-11"
     >
       {link.label}
       <ArrowOut />
@@ -53,7 +53,7 @@ function DemoButton({ link }: { link: ProjectLink }) {
       target="_blank"
       rel="noreferrer noopener"
       aria-label={link.a11yLabel ?? link.label}
-      className="inline-flex items-center gap-2 rounded-trace border border-copper bg-copper px-4 py-2 text-micro font-semibold text-substrate hover:opacity-85"
+      className="inline-flex items-center gap-2 rounded-trace border border-copper bg-copper px-4 py-2 text-micro font-semibold text-substrate hover:opacity-85 pointer-coarse:min-h-11"
     >
       {link.label}
       <ArrowOut />
@@ -88,7 +88,6 @@ export function ProjectEntry({ project }: { project: Project }) {
     links,
     image,
     visual,
-    liveSignal,
     team,
   } = project;
 
@@ -129,7 +128,7 @@ export function ProjectEntry({ project }: { project: Project }) {
         it to fit a shape throws away the part that makes it evidence.
       */}
       {image && (
-        <div className="relative mt-8 aspect-[3/2] w-full max-w-column overflow-hidden rounded-trace border border-hairline bg-surface">
+        <div className="relative mt-8 aspect-[3/2] w-full overflow-hidden rounded-trace border border-hairline bg-surface">
           <Image
             src={image.src}
             alt={image.alt}
@@ -140,23 +139,23 @@ export function ProjectEntry({ project }: { project: Project }) {
           />
         </div>
       )}
-      {visual === "pipeline" && <PipelineDiagram />}
+      {visual === "tradewatch" && <TradeWatchDemo />}
       {visual === "terminal" && <TerminalBlock />}
       {visual === "bridgeaid-map" && <BridgeAidDemo />}
-      {visual === "hex-board" && <HexBoard />}
-      {liveSignal && <LiveSignal />}
+      {visual === "triage" && <TriageDemo />}
+      {visual === "catan" && <CatanDemo />}
 
       {/* The write-up follows all of the media, so each entry shows the work
           first and then explains it. */}
-      <Fade className="mt-8 max-w-column space-y-4 text-silk-dim">
+      <Fade className="mt-8 space-y-4 text-silk-dim">
         {description.map((para) => (
           <p key={para}>{para}</p>
         ))}
       </Fade>
 
       {details.length > 0 && (
-        <details className="group mt-8 max-w-column">
-          <summary className="inline-flex cursor-pointer items-center gap-2 text-micro text-silk-dim hover:text-copper">
+        <details className="group mt-8">
+          <summary className="inline-flex cursor-pointer items-center gap-2 text-micro text-silk-dim hover:text-copper pointer-coarse:min-h-11">
             <span
               aria-hidden="true"
               className="inline-block transition-transform duration-200 ease-trace group-open:rotate-90"
@@ -178,9 +177,7 @@ export function ProjectEntry({ project }: { project: Project }) {
         </details>
       )}
 
-      {team && (
-        <p className="mt-6 max-w-column text-micro text-silk-faint">{team}</p>
-      )}
+      {team && <p className="mt-6 text-micro text-silk-faint">{team}</p>}
 
       <ul className="mt-7 flex flex-wrap gap-x-2 gap-y-2">
         {stack.map((tech) => (

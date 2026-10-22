@@ -59,12 +59,13 @@ export const radPerPx = (canvasCssWidth: number) =>
   GRAPH_VIEWBOX.width / (SCREEN_R * canvasCssWidth);
 
 /**
- * The resting orientation: a small tilt so there is depth at first sight. It
- * is also the fixed view under reduced motion.
+ * The resting orientation: tilted so there is depth at first sight and, picked
+ * by search over tilts, so no two of the five nodes or labels overlap. It is
+ * also the fixed view under reduced motion.
  */
 export const R0: Mat3 = multiply(
-  axisAngle([1, 0, 0], -0.22),
-  axisAngle([0, 1, 0], 0.4),
+  axisAngle([1, 0, 0], -0.6),
+  axisAngle([0, 1, 0], -0.4),
 );
 
 export type Frame = {
@@ -147,6 +148,7 @@ export type Palette = {
   hairline: string;
   edge: string;
   substrate: string;
+  silk: string;
   silkDim: string;
   silkFaint: string;
   font: string;
@@ -161,6 +163,7 @@ export function readPalette(): Palette {
     hairline: v("--hairline"),
     edge: v("--edge"),
     substrate: v("--substrate"),
+    silk: v("--silk"),
     silkDim: v("--silk-dim"),
     silkFaint: v("--silk-faint"),
     // Resolved on <body>, where next/font's variable is in scope.
@@ -249,6 +252,8 @@ export type Timing = {
 };
 
 const PACKET_MS = 520;
+/** One trip of an ambient signal along a trace. */
+const SIGNAL_MS = 3200;
 const PACKET_LEN = 0.07;
 const REVEAL_MS = 400;
 const REVEAL_STAGGER_MS = 30;
@@ -259,18 +264,14 @@ const PEOPLE_FADE_MS = 300;
 const ease = (t: number) => 1 - Math.pow(1 - t, 4);
 const clamp01 = (t: number) => Math.min(Math.max(t, 0), 1);
 
-/** Is anything time-based still in flight? If not, the loop can skip frames. */
+/**
+ * Is anything time-based still in flight? If not, the loop can skip frames.
+ * Without reduced motion the answer is always yes: signals run along the
+ * traces continuously (the round-2 motion amendment, DESIGN_BRIEF §2.9). The
+ * component only runs the loop while the graph is on screen.
+ */
 export function isAnimating(t: Timing) {
-  if (t.reduced) return false;
-  const revealing =
-    t.revealAt === null ||
-    t.now - t.revealAt <
-      Math.max(
-        REVEAL_MS + EDGES.length * REVEAL_STAGGER_MS,
-        PEOPLE_FADE_DELAY_MS + PEOPLE_FADE_MS,
-      );
-  const packeting = t.packetAt !== null && t.now - t.packetAt < PACKET_MS;
-  return revealing || packeting;
+  return !t.reduced;
 }
 
 type Pt = { x: number; y: number };
@@ -364,15 +365,46 @@ export function draw(
     if (reveal <= 0) return;
 
     const depth = 0.35 + 0.65 * ((a.p.depth + b.p.depth) / 2);
-    ctx.globalAlpha =
-      depth * (active && !lit ? 0.3 : 1) * (people ? reveal : 1);
-    // At rest a dashed hairline all but vanishes, so teammate edges sit one
-    // step up the neutral scale to read as clearly as the solid ones.
-    ctx.strokeStyle = lit ? pal.copper : people ? pal.edge : pal.hairline;
-    ctx.lineWidth = 1;
-    ctx.lineCap = "butt";
-    ctx.setLineDash(people ? [3, 4] : []);
-    strokeSpan(ctx, a, b, c, 0, people ? 1 : reveal);
+    const fade = depth * (active && !lit ? 0.3 : 1) * (people ? reveal : 1);
+    ctx.lineCap = "round";
+
+    if (!people) {
+      // A copper trace with a soft bloom under it, so the shared-stack links
+      // read as live wiring rather than a faint hairline.
+      ctx.setLineDash([]);
+      ctx.globalAlpha = fade * (lit ? 0.35 : 0.12);
+      ctx.strokeStyle = pal.copper;
+      ctx.lineWidth = lit ? 7 : 5;
+      strokeSpan(ctx, a, b, c, 0, reveal);
+      ctx.globalAlpha = fade * (lit ? 1 : 0.55);
+      ctx.lineWidth = lit ? 2 : 1.4;
+      strokeSpan(ctx, a, b, c, 0, reveal);
+    } else {
+      // Teammate links: a dashed line whose dashes march slowly, like data
+      // moving between people rather than parts.
+      ctx.globalAlpha = fade * (lit ? 1 : 0.8);
+      ctx.strokeStyle = lit ? pal.copper : pal.silkFaint;
+      ctx.lineWidth = lit ? 1.5 : 1.1;
+      ctx.setLineDash([3, 4]);
+      ctx.lineDashOffset = t.reduced ? 0 : -t.now / 90;
+      strokeSpan(ctx, a, b, c, 0, 1);
+      ctx.lineDashOffset = 0;
+    }
+
+    // Ambient signal: one small pulse per trace, staggered so they never
+    // move in step. Off under reduced motion, and only once drawn in.
+    if (!people && !t.reduced && reveal >= 1) {
+      const u = (t.now / SIGNAL_MS + i * 0.37) % 1;
+      const pt = along(a, b, c, u);
+      // Fade in and out at the ends so a pulse never pops at a node.
+      const edgeFade = Math.min(1, u * 6, (1 - u) * 6);
+      drawGlow(ctx, pt.x, pt.y, 0.35, pal.copper, fade * edgeFade * 0.9);
+      ctx.globalAlpha = fade * edgeFade;
+      ctx.fillStyle = pal.copper;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, lit ? 2.6 : 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Packet: hover only, once, never ambient (§2.3).
     if (touched && t.packetAt !== null && !t.reduced) {
@@ -419,13 +451,52 @@ export function draw(
     // Depth cue floor is high enough that the farthest label stays legible.
     // The idle node is lifted to full strength so the cue reads even when
     // it happens to sit at the back.
-    ctx.globalAlpha = idleLit ? 1 : (0.4 + 0.6 * n.p.depth) * (dim ? 0.28 : 1);
+    const base = idleLit ? 1 : (0.4 + 0.6 * n.p.depth) * (dim ? 0.28 : 1);
+    // Every node carries a faint halo of its own, brighter when lit, so the
+    // five projects read as powered parts on the board.
+    drawGlow(
+      ctx,
+      n.x,
+      n.y,
+      n.p.scale * s * (lit ? 1.1 : 0.8),
+      pal.copper,
+      base * (lit ? 0.9 : 0.35),
+    );
+
+    // A pad: dark body, copper ring, copper core.
+    const r = 7 * n.p.scale * s;
+    ctx.globalAlpha = base;
     ctx.beginPath();
-    ctx.arc(n.x, n.y, 4.5 * n.p.scale * s, 0, Math.PI * 2);
-    ctx.fillStyle = lit ? pal.copper : pal.substrate;
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = pal.substrate;
     ctx.fill();
-    ctx.strokeStyle = lit ? pal.copper : pal.edge;
+    ctx.lineWidth = lit ? 2 : 1.5;
+    ctx.strokeStyle = pal.copper;
+    ctx.globalAlpha = base * (lit ? 1 : 0.75);
     ctx.stroke();
+    ctx.globalAlpha = base;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r * (lit ? 0.5 : 0.38), 0, Math.PI * 2);
+    ctx.fillStyle = lit ? pal.copper : rgba(pal.copper, 0.85);
+    ctx.fill();
+
+    // The node under the pointer gets a slowly turning dashed ring.
+    if (id === cursorNode) {
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      ctx.rotate(t.reduced ? 0 : t.now / 1400);
+      ctx.setLineDash([2.5, 3.5]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = pal.copper;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 5 * s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = base;
+    ctx.lineWidth = 1;
 
     // As the graph turns, labels pass over edges and each other. A halo in
     // the board colour, drawn under each label, keeps the nearer one readable
@@ -434,7 +505,7 @@ export function draw(
     const label = node.label;
     // Labels hang off the right of the node. Enlarged on a phone, one near
     // the right edge would run out of the frame, so it swaps to the left.
-    const gap = 12 * s;
+    const gap = 15 * s;
     let width = ctx.measureText(label).width;
     if (node.note) {
       ctx.font = noteFont;
@@ -453,7 +524,7 @@ export function draw(
     ctx.strokeText(label, lx, n.y + 4 * s);
     ctx.globalAlpha = alpha;
     ctx.lineWidth = 1;
-    ctx.fillStyle = lit || idleLit ? pal.copper : pal.silkDim;
+    ctx.fillStyle = lit || idleLit ? pal.copper : pal.silk;
     ctx.fillText(label, lx, n.y + 4 * s);
 
     // A per-project annotation (e.g. a teammate on this project alone) sits

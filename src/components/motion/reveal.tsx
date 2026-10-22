@@ -139,3 +139,34 @@ export function Fade({
     </motion.div>
   );
 }
+
+/**
+ * A group whose children rise in one after another, the first time the group
+ * is properly in view. The motion itself is CSS (`[data-stagger]` in
+ * globals.css); this only marks the moment, so the server render, the
+ * no-JavaScript page and reduced motion all show the finished state.
+ * Each child should set `--i` (its position) in its style.
+ */
+export function Stagger({
+  as: Tag = "div",
+  children,
+  className,
+}: {
+  as?: "div" | "ul" | "ol";
+  children: ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
+  return (
+    <Tag
+      // The polymorphic tag makes the ref type awkward; any element works.
+      ref={ref as never}
+      data-stagger
+      data-in={inView || undefined}
+      className={className}
+    >
+      {children}
+    </Tag>
+  );
+}

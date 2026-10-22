@@ -13,8 +13,9 @@ const isDev = process.env.NODE_ENV === "development";
  *   Policy"). Leaflet and Motion also set inline styles.
  * - `'unsafe-eval'` in development only: React uses eval for its dev-mode
  *   error stacks. Production needs neither.
- * - The one third-party origin is the OpenStreetMap tile server for the
- *   BridgeAid demo map. Fonts are self-hosted by next/font.
+ * - Third-party origins: the OpenStreetMap tile server for the BridgeAid
+ *   demo map, and Web3Forms for the contact form. Fonts are self-hosted by
+ *   next/font.
  * - `ws:` in development only, for the dev server's hot reload.
  */
 const csp = [
@@ -23,7 +24,10 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "font-src 'self'",
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
+  // Web3Forms receives the contact form (DESIGN_BRIEF.md §2.8). fetch() is
+  // governed by connect-src; form-action stays 'self' because the form never
+  // navigates anywhere.
+  `connect-src 'self' https://api.web3forms.com${isDev ? " ws:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

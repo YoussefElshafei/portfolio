@@ -2,6 +2,7 @@ import { Section } from "@/components/sections/section";
 import { Fade } from "@/components/motion/reveal";
 import { ProjectGraph } from "@/components/graph/project-graph";
 import { ProjectEntry } from "@/components/work/project-entry";
+import { ProjectBoard } from "@/components/work/project-board";
 import { PROJECTS } from "@/data/projects";
 
 /**
@@ -14,7 +15,7 @@ import { PROJECTS } from "@/data/projects";
 export function Work() {
   return (
     <Section id="work" ref_="02" title="Projects" className="pb-28">
-      <Fade className="mb-10 max-w-column text-silk-dim">
+      <Fade className="mb-10 text-silk-dim">
         <p>
           Five projects, each with a short account of what it does and what made
           it interesting to build. Nodes in the diagram link to the entry below.
@@ -28,6 +29,7 @@ export function Work() {
           <ProjectEntry key={project.id} project={project} />
         ))}
       </div>
+      <ProjectBoard />
     </Section>
   );
 }

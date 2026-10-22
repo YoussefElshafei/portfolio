@@ -221,7 +221,7 @@ export function CommandPalette() {
         onClick={openPalette}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-faint hover:border-edge hover:text-silk lg:size-auto lg:px-2.5 lg:py-1.5"
+        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-trace border border-hairline text-silk-faint hover:border-edge hover:text-silk lg:size-auto lg:px-2.5 lg:py-1.5 lg:pointer-coarse:min-h-11"
       >
         {/*
           A magnifier below `lg`, the shortcut above it. The shortcut hint is

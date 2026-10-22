@@ -2,9 +2,9 @@
  * Synthetic signal generation and rolling anomaly detection.
  *
  * This is the logic behind the Live Signal widget on the TradeWatch entry. It
- * is a genuine, simplified implementation of the same statistical check
- * TradeWatch runs against real market data: a rolling mean and standard
- * deviation over a moving window, with points flagged by z-score.
+ * is a simplified implementation of TradeWatch's baseline detector: each
+ * move is scored by a robust z-score (median and median absolute deviation)
+ * over a rolling window of recent moves, and flagged above 3.5.
  *
  * Deliberately pure and free of React so it can be read, reasoned about and
  * tested on its own. Nothing here calls `Math.random()`.
@@ -17,9 +17,9 @@
  *     fat tails, so the shocks are a fair approximation rather than a cheat.
  *
  *  2. The *detector* is real and knows nothing about where the shocks are. It
- *     sees only the series, computes rolling statistics, and flags on z-score.
+ *     sees only the series, computes rolling statistics, and flags on a robust z-score.
  *     It will miss shocks that land inside normal variance and will flag
- *     ordinary points that happen to sit far from the local mean. That is the
+ *     ordinary moves that happen to be unusually large. That is the
  *     honest behaviour of this class of detector, and it is not corrected for.
  */
 
@@ -58,79 +58,92 @@ export function gaussian(rng: () => number): number {
 }
 
 /* ------------------------------------------------------------------ *
- * Rolling statistics
+ * Robust rolling statistics
  * ------------------------------------------------------------------ */
 
-export type Stats = { mean: number; std: number };
+/**
+ * The constant that makes a median absolute deviation comparable to a
+ * standard deviation under a normal distribution, 1 / Φ⁻¹(3/4). TradeWatch
+ * uses the same value (`_MAD_SCALE` in its baseline detector).
+ */
+export const MAD_SCALE = 1.4826;
+
+export function median(values: readonly number[]): number {
+  const n = values.length;
+  if (n === 0) return Number.NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = n >> 1;
+  return n % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export type RobustStats = {
+  median: number;
+  /** MAD × MAD_SCALE: a spread in the same units as a standard deviation. */
+  sigma: number;
+};
 
 /**
- * Mean and *sample* standard deviation (n-1 denominator) of a window.
+ * Median and scaled median absolute deviation of a window.
  *
- * Recomputed across the whole window each tick rather than maintained
- * incrementally. At a window of 30 that is thirty additions, which is nothing,
- * and it avoids the classic failure of subtract-as-you-go running variance:
- * repeatedly adding and removing terms accumulates floating-point error and
- * can drift to a small negative variance, at which point the square root is
- * NaN and every downstream z-score is silently broken. Correctness first at
- * this size.
+ * Why not mean and standard deviation: both are pulled by the very outliers
+ * the detector is looking for. One large move inflates the "normal" range
+ * enough to hide the next one. The median and the MAD barely notice a single
+ * extreme value, which is the reason TradeWatch's baseline uses them
+ * (ADR-0008 in that repository). It is also why the point under test can sit
+ * inside its own window, as it does in TradeWatch, without hiding itself.
  */
-export function rollingStats(window: readonly number[]): Stats {
-  const n = window.length;
-  if (n === 0) return { mean: Number.NaN, std: Number.NaN };
-  if (n === 1) return { mean: window[0], std: 0 };
-
-  let sum = 0;
-  for (const v of window) sum += v;
-  const mean = sum / n;
-
-  let sumSq = 0;
-  for (const v of window) {
-    const d = v - mean;
-    sumSq += d * d;
-  }
-  return { mean, std: Math.sqrt(sumSq / (n - 1)) };
+export function robustStats(window: readonly number[]): RobustStats {
+  const m = median(window);
+  if (Number.isNaN(m)) return { median: Number.NaN, sigma: Number.NaN };
+  const mad = median(window.map((v) => Math.abs(v - m)));
+  return { median: m, sigma: mad * MAD_SCALE };
 }
 
 /**
- * How many standard deviations `value` sits from `mean`.
+ * How many robust standard deviations `value` sits from the median. Signed,
+ * so the widget can say "above" or "below".
  *
- * Returns 0 when the baseline has effectively no spread. A flat window makes
- * the z-score undefined rather than infinite, and reporting 0 keeps a
- * degenerate baseline from flagging every subsequent point.
+ * Returns 0 when the window has no spread at all. TradeWatch declines to
+ * score in that case; reporting 0 here keeps a degenerate window from
+ * flagging every later point.
  */
-export function zScore(value: number, { mean, std }: Stats): number {
-  if (!Number.isFinite(std) || std < 1e-9) return 0;
-  return (value - mean) / std;
+export function robustZ(value: number, { median: m, sigma }: RobustStats) {
+  if (!Number.isFinite(sigma) || sigma < 1e-9) return 0;
+  return (value - m) / sigma;
 }
 
 /* ------------------------------------------------------------------ *
  * The detector
  * ------------------------------------------------------------------ */
 
-export const WINDOW = 30;
-export const THRESHOLD = 2.5;
-/** Points kept on screen. Must exceed WINDOW so a full baseline always exists. */
+/** TradeWatch's defaults: TW_ANOMALY_WINDOW_BARS and the baseline threshold. */
+export const WINDOW = 60;
+export const THRESHOLD = 3.5;
+/** Points kept on screen. */
 export const VIEW = 72;
 
 export type Sample = {
   /** Monotonic tick index since the series began. */
   t: number;
   value: number;
-  /** Rolling mean of the WINDOW points *before* this one. */
-  mean: number;
-  std: number;
+  /** Where the detector expected this point: the previous value plus the
+   *  median move of the window. */
+  expected: number;
+  /** Robust spread of a move, in price units. */
+  sigma: number;
+  /** Robust z-score of this point's move. */
   z: number;
   anomaly: boolean;
 };
 
 /**
- * Judges `value` against the window of points that came *before* it.
+ * Scores the move into `value`, the way TradeWatch's baseline scores a bar's
+ * return: against the median and MAD of the last `windowSize` moves,
+ * including this one.
  *
- * The exclusion is the important part. If the point under test is included in
- * its own baseline it drags the mean toward itself and inflates the standard
- * deviation, which shrinks its own z-score — the larger the outlier, the more
- * it hides itself. With a window of 30 a true 4-sigma spike scores about 3.4
- * if it is allowed into its own baseline. Judge each point against its past.
+ * One feature instead of TradeWatch's several (return, volatility, volume and
+ * trade count), and per tick instead of per closed one-minute bar. The rule
+ * is the same one.
  */
 export function classify(
   history: readonly number[],
@@ -139,19 +152,24 @@ export function classify(
   windowSize: number = WINDOW,
   threshold: number = THRESHOLD,
 ): Sample {
-  const baseline = history.slice(-windowSize);
-  const stats = rollingStats(baseline);
-  const z = zScore(value, stats);
+  const prev = history.length ? history[history.length - 1] : value;
+  const moves: number[] = [];
+  for (let i = 1; i < history.length; i++)
+    moves.push(history[i] - history[i - 1]);
+  const move = value - prev;
+  const window = [...moves, move].slice(-windowSize);
+  const stats = robustStats(window);
+  const z = robustZ(move, stats);
 
   return {
     t,
     value,
-    mean: stats.mean,
-    std: stats.std,
+    expected: prev + stats.median,
+    sigma: stats.sigma,
     z,
-    // A baseline shorter than the window has not warmed up, so nothing is
-    // flagged yet rather than being flagged against two or three points.
-    anomaly: baseline.length >= windowSize && Math.abs(z) > threshold,
+    // Nothing is flagged until a full window of moves exists, rather than
+    // being judged against two or three of them.
+    anomaly: window.length >= windowSize && Math.abs(z) > threshold,
   };
 }
 
@@ -167,8 +185,9 @@ const SHOCK_MIN = 3.2; // shock magnitude, in units of SIGMA
 const SHOCK_MAX = 5.5;
 
 export type SignalStream = {
-  /** Produces the next sample and records it in the stream's own history. */
-  next: () => Sample;
+  /** Produces the next sample and records it in the stream's own history.
+   *  `shock` adds an extra move of that many σ, for the demo's buttons. */
+  next: (shock?: number) => Sample;
 };
 
 /**
@@ -183,8 +202,8 @@ export function createSignalStream(seed: number, warmup = 0): SignalStream {
   let level = MU;
   let t = 0;
 
-  const advance = (): Sample => {
-    level += THETA * (MU - level) + SIGMA * gaussian(rng);
+  const advance = (shock = 0): Sample => {
+    level += THETA * (MU - level) + SIGMA * gaussian(rng) + shock * SIGMA;
 
     if (rng() < SHOCK_PROB) {
       const magnitude = SHOCK_MIN + rng() * (SHOCK_MAX - SHOCK_MIN);
@@ -193,13 +212,14 @@ export function createSignalStream(seed: number, warmup = 0): SignalStream {
 
     const sample = classify(history, level, t++);
     history.push(level);
-    if (history.length > WINDOW * 2) history.shift();
+    // WINDOW moves need WINDOW + 1 levels; keep a little slack.
+    if (history.length > WINDOW + 2) history.shift();
     return sample;
   };
 
   for (let i = 0; i < warmup; i++) advance();
 
-  return { next: advance };
+  return { next: (shock?: number) => advance(shock) };
 }
 
 /**
@@ -210,7 +230,7 @@ export function createSignalStream(seed: number, warmup = 0): SignalStream {
  * hydration mismatch and no flash of an empty chart. The widget's own stream
  * is then fast-forwarded past this prefix so ticking continues seamlessly.
  */
-export const PRIMED_TICKS = WINDOW + VIEW;
+export const PRIMED_TICKS = WINDOW + 1 + VIEW;
 
 export function primedSeries(seed: number): Sample[] {
   const stream = createSignalStream(seed);

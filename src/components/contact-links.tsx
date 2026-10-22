@@ -39,7 +39,7 @@ const LINKS: Link[] = [
 ];
 
 const BOX =
-  "inline-flex size-9 items-center justify-center rounded-trace border border-hairline";
+  "inline-flex size-11 items-center justify-center rounded-trace border border-hairline";
 
 /**
  * The three contact links, used in the header, the contact section and the

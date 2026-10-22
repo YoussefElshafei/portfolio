@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { SKILL_GROUPS, related, type Skill } from "@/data/skills";
 
 /**
@@ -24,13 +24,20 @@ export function SkillMatrix() {
   const [probed, setProbed] = useState<Skill | null>(null);
   const readoutId = useId();
 
+  // Touch has no hover, and iOS Safari does not focus a tapped button, so a
+  // tap toggles the probe explicitly. Mouse and keyboard keep hover and focus.
+  const tap = useRef<{ touch: boolean; wasActive: boolean }>({
+    touch: false,
+    wasActive: false,
+  });
+
   const probe = (s: Skill) => {
     setActive(s);
     setProbed(s);
   };
 
   return (
-    <div className="max-w-column">
+    <div>
       {/*
         The probe readout. Announced politely, because it changes only when
         the visitor moves to a different skill, and it answers the question
@@ -89,16 +96,39 @@ export function SkillMatrix() {
                   active !== null && !isActive && !related(active, skill);
                 const used = skill.projects.length > 0;
                 return (
-                  <li key={skill.label}>
+                  <li key={skill.label} className="relative">
+                    {/* A quick popover over the probed part. Decorative: the
+                        PROBE readout above says the same thing in full. */}
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="pop-in shadow-lg shadow-black/40 pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 rounded-trace border border-copper bg-surface px-2 py-1 font-mono text-micro whitespace-nowrap text-silk"
+                      >
+                        {used
+                          ? `in ${skill.projects.length} project${skill.projects.length === 1 ? "" : "s"}`
+                          : "no project"}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onMouseEnter={() => probe(skill)}
                       onMouseLeave={() => setActive(null)}
                       onFocus={() => probe(skill)}
                       onBlur={() => setActive(null)}
+                      onPointerDown={(e) => {
+                        tap.current = {
+                          touch: e.pointerType !== "mouse",
+                          wasActive: isActive,
+                        };
+                      }}
+                      onClick={() => {
+                        if (!tap.current.touch) return;
+                        if (tap.current.wasActive) setActive(null);
+                        else probe(skill);
+                      }}
                       aria-describedby={readoutId}
                       data-state={isActive ? "on" : dim ? "dim" : "rest"}
-                      className={`chip cursor-pointer rounded-trace border px-2 py-0.5 font-mono text-micro ${
+                      className={`chip cursor-pointer rounded-trace border px-2 py-0.5 font-mono text-micro pointer-coarse:min-h-11 ${
                         isActive
                           ? "border-copper text-copper"
                           : used

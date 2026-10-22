@@ -63,6 +63,11 @@
   --color-copper-wash: var(--copper-wash);
   --color-signal: var(--signal);
 
+  /* Terminal window dots (§2.8). Decorative, desaturated, nowhere else. */
+  --color-dot-close: #c9625b;
+  --color-dot-min: #c9a24f;
+  --color-dot-max: #5f9e63;
+
   /* Two typefaces, exactly. §3.1 */
   --font-*: initial;
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
@@ -86,6 +91,9 @@
   /* Radius capped at 4px. §2.5 */
   --radius-*: initial;
   --radius-trace: 4px;
+  /* Terminal windows only (§2.8): a window frame reads as a window at 8px,
+     and as a card at 4px. */
+  --radius-window: 8px;
 
   /* No shadows, either theme. §2.5 */
   --shadow-*: initial;
@@ -181,6 +189,23 @@ h4 {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+}
+
+/* Hover and focus micro-interactions (2026-10-21): colour changes on links
+   and buttons ease over 150ms instead of snapping. Colour only, never
+   transform or layout, so nothing moves. In the base layer, so any component
+   that sets its own transition still wins. Off under reduced motion. */
+@layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    a,
+    button,
+    summary {
+      transition-property:
+        color, background-color, border-color, text-decoration-color, opacity;
+      transition-duration: 150ms;
+      transition-timing-function: var(--ease-trace);
+    }
   }
 }
 
@@ -287,6 +312,14 @@ summary::-webkit-details-marker {
     transform-box: fill-box;
     transform-origin: center;
     animation: signal-pulse 900ms var(--ease-trace) 1 forwards;
+  }
+}
+
+/* Rendered regardless of the setting (the server cannot know it, and a ring
+   that exists on one side of hydration only is a mismatch), hidden here. */
+@media (prefers-reduced-motion: reduce) {
+  .signal-pulse {
+    display: none;
   }
 }
 
@@ -543,5 +576,204 @@ summary::-webkit-details-marker {
       opacity 150ms var(--ease-trace),
       color 150ms var(--ease-trace),
       border-color 150ms var(--ease-trace);
+  }
+}
+
+/* Leaflet's zoom buttons are 30px even in its touch mode; 44px on touch
+   screens, matching every other control (§2.8). */
+@media (pointer: coarse) {
+  .leaflet-container.leaflet-touch .leaflet-bar a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+  }
+}
+
+/* ============================================================================
+   POINTER AND ENTRANCE EFFECTS — round 2
+
+   Driven by PointerFx (components/motion/pointer-fx.tsx), which only writes
+   CSS variables. Everything here is off for touch and reduced motion except
+   the plain hover states, which are instant.
+   ========================================================================== */
+
+/* Traces of the backdrop light up around the cursor. The span sits inside
+   the masked grid, so only the traces themselves take the light. */
+.circuit-lit {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(
+    circle 260px at var(--lx, -999px) var(--ly, -999px),
+    color-mix(in srgb, var(--copper) 55%, transparent),
+    transparent 70%
+  );
+}
+
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .circuit-lit {
+    opacity: 1;
+  }
+}
+
+/* A copper edge light that follows the cursor around a panel. The panel
+   keeps its own border; the light is a masked ring drawn over it. */
+.glow {
+  position: relative;
+}
+
+.glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1000; /* above Leaflet's panes */
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle 220px at var(--gx, 50%) var(--gy, 50%),
+    var(--copper),
+    transparent 70%
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  transition: opacity 200ms var(--ease-trace);
+}
+
+/* A faint wash of the same light inside the panel, so the effect reads at a
+   glance and not only on the 1px edge. */
+.glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 999;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle 360px at var(--gx, 50%) var(--gy, 50%),
+    color-mix(in srgb, var(--copper) 7%, transparent),
+    transparent 70%
+  );
+  transition: opacity 200ms var(--ease-trace);
+}
+
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .glow:hover::after {
+    opacity: 1;
+  }
+  .glow:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Small cards: lift and light on hover. PointerFx adds the tilt. */
+.lift {
+  transition:
+    transform 200ms var(--ease-trace),
+    border-color 200ms var(--ease-trace),
+    background-color 200ms var(--ease-trace),
+    box-shadow 200ms var(--ease-trace);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -18px
+      color-mix(in srgb, var(--copper) 60%, transparent);
+  }
+}
+
+[data-magnetic] {
+  transition: translate 180ms var(--ease-trace);
+}
+
+/* Staggered entrance: children rise in one after another the first time the
+   group scrolls into view (Stagger sets data-in). Without JavaScript or under
+   reduced motion they are simply there. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-stagger]:not([data-in]) > * {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  [data-stagger] > * {
+    transition:
+      opacity 420ms var(--ease-trace),
+      transform 420ms var(--ease-trace);
+  }
+  [data-stagger][data-in] > * {
+    transition-delay: calc(min(var(--i, 0), 10) * 70ms);
+  }
+}
+
+/* The hero's prompt types itself out once. Mono, so `ch` steps are exact. */
+.type-line {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  width: calc(var(--chars) * 1ch);
+}
+
+.type-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  vertical-align: -0.12em;
+  background: var(--copper);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .type-line {
+    animation: type-in calc(var(--chars) * 55ms) steps(var(--chars)) 400ms both;
+  }
+  .type-caret {
+    animation: caret-blink 1s steps(1) infinite;
+  }
+}
+
+@keyframes type-in {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Small popovers (skill chips) scale in from their anchor. */
+@media (prefers-reduced-motion: no-preference) {
+  .pop-in {
+    animation: pop-in 160ms var(--ease-trace) both;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px) scale(0.96);
+  }
+}
+
+/* Easter egg: the Konami code overclocks the board (EasterEggs sets
+   data-overclock). Traces brighten and the pulses run four times faster.
+   Reduced motion only gets the brighter traces. */
+:root[data-overclock] .circuit-grid {
+  background-color: color-mix(in srgb, var(--copper) 14%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-overclock] .circuit-grid {
+    animation-duration: 30s;
+  }
+  :root[data-overclock] .circuit-pulse-h,
+  :root[data-overclock] .circuit-pulse-v {
+    animation-duration: 6s;
+    animation-delay: 0s;
   }
 }

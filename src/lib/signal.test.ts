@@ -2,14 +2,16 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  MAD_SCALE,
   THRESHOLD,
   WINDOW,
   classify,
   createRng,
   createSignalStream,
+  median,
   primedSeries,
-  rollingStats,
-  zScore,
+  robustStats,
+  robustZ,
 } from "./signal.ts";
 
 /**
@@ -20,73 +22,92 @@ import {
  * that looks fine.
  */
 
-describe("rollingStats", () => {
-  it("matches a hand-checked dataset", () => {
-    // mean 5, sample variance 32/7, sd 2.138089...
-    const { mean, std } = rollingStats([2, 4, 4, 4, 5, 5, 7, 9]);
-    assert.equal(mean, 5);
-    assert.ok(Math.abs(std - Math.sqrt(32 / 7)) < 1e-12);
+describe("median", () => {
+  it("takes the middle value, or the mean of the two middle values", () => {
+    assert.equal(median([3, 1, 2]), 2);
+    assert.equal(median([4, 1, 3, 2]), 2.5);
   });
 
-  it("uses the sample (n-1) denominator, not the population one", () => {
-    const { std } = rollingStats([1, 3]);
-    // sample sd of [1,3] is sqrt(2) ≈ 1.4142; the population sd would be 1.
-    assert.ok(Math.abs(std - Math.SQRT2) < 1e-12);
-  });
-
-  it("reports zero spread for a constant window", () => {
-    assert.equal(rollingStats([7, 7, 7, 7]).std, 0);
-  });
-
-  it("degrades safely on empty and single-element windows", () => {
-    assert.ok(Number.isNaN(rollingStats([]).mean));
-    assert.deepEqual(rollingStats([4]), { mean: 4, std: 0 });
+  it("does not reorder its input", () => {
+    const input = [3, 1, 2];
+    median(input);
+    assert.deepEqual(input, [3, 1, 2]);
   });
 });
 
-describe("zScore", () => {
-  it("counts standard deviations from the mean", () => {
-    assert.equal(zScore(12, { mean: 10, std: 2 }), 1);
-    assert.equal(zScore(6, { mean: 10, std: 2 }), -2);
+describe("robustStats", () => {
+  it("matches a hand-checked dataset", () => {
+    // median 3; absolute deviations 2,1,0,1,97 have median 1. The 100
+    // moves neither number, which is the point of the method.
+    const { median: m, sigma } = robustStats([1, 2, 3, 4, 100]);
+    assert.equal(m, 3);
+    assert.ok(Math.abs(sigma - MAD_SCALE) < 1e-12);
   });
 
-  it("returns 0 rather than Infinity when the baseline is flat", () => {
-    // Without this guard every point after a flat window flags forever.
-    assert.equal(zScore(99, { mean: 7, std: 0 }), 0);
-    assert.equal(zScore(99, { mean: 7, std: Number.NaN }), 0);
+  it("uses TradeWatch's scale constant", () => {
+    assert.equal(MAD_SCALE, 1.4826);
+  });
+
+  it("barely moves when one extreme value joins the window", () => {
+    // The reason for median/MAD: a mean and standard deviation would be
+    // dragged by the outlier they are meant to detect.
+    const calm = [-1, 1, -1, 1, -1, 1, -1, 1, 0];
+    const before = robustStats(calm);
+    const after = robustStats([...calm.slice(1), 50]);
+    assert.ok(Math.abs(after.median - before.median) <= 1);
+    assert.ok(after.sigma <= before.sigma * 1.01);
+  });
+
+  it("reports zero spread for a constant window", () => {
+    assert.equal(robustStats([7, 7, 7, 7]).sigma, 0);
+  });
+
+  it("degrades safely on an empty window", () => {
+    assert.ok(Number.isNaN(robustStats([]).median));
+  });
+});
+
+describe("robustZ", () => {
+  it("counts robust standard deviations from the median, with sign", () => {
+    assert.equal(robustZ(12, { median: 10, sigma: 2 }), 1);
+    assert.equal(robustZ(6, { median: 10, sigma: 2 }), -2);
+  });
+
+  it("returns 0 rather than Infinity when the window is flat", () => {
+    assert.equal(robustZ(99, { median: 7, sigma: 0 }), 0);
+    assert.equal(robustZ(99, { median: 7, sigma: Number.NaN }), 0);
   });
 });
 
 describe("classify", () => {
-  const flat = Array.from({ length: WINDOW }, (_, i) => (i % 2 ? 1 : -1));
+  // A level series whose moves alternate -1, +1: median move 0, MAD 1.
+  const levels = Array.from({ length: WINDOW + 1 }, (_, i) => (i % 2 ? 1 : 0));
+  const last = levels[levels.length - 1];
+  const sigma = MAD_SCALE;
 
-  it("excludes the point under test from its own baseline", () => {
-    // The whole reason for judging a point against its past: included in its
-    // own window, a large outlier drags the mean toward itself and inflates
-    // the standard deviation, shrinking its own score.
-    const { std } = rollingStats(flat);
-    const spike = 4 * std;
-
-    const excluded = classify(flat, spike, 0).z;
-    const included = zScore(spike, rollingStats([...flat, spike]));
-
-    assert.ok(Math.abs(excluded - 4) < 1e-9, `expected ~4, got ${excluded}`);
-    assert.ok(
-      Math.abs(included) < Math.abs(excluded),
-      "a self-included baseline must understate the outlier",
-    );
+  it("scores the move, not the level", () => {
+    const s = classify(levels, last + 2 * sigma, 0);
+    assert.ok(Math.abs(s.z - 2) < 0.05, `expected about 2, got ${s.z}`);
+    assert.ok(Math.abs(s.expected - last) < 1e-9);
   });
 
-  it("does not flag before the window has warmed up", () => {
-    const short = [0, 0, 0];
-    const sample = classify(short, 1000, 0);
-    assert.equal(sample.anomaly, false);
+  it("does not flag before a full window of moves exists", () => {
+    assert.equal(classify([0, 1, 0], 1000, 0).anomaly, false);
   });
 
   it("flags only beyond the threshold", () => {
-    const { std } = rollingStats(flat);
-    assert.equal(classify(flat, 2.0 * std, 0).anomaly, false);
-    assert.equal(classify(flat, (THRESHOLD + 0.5) * std, 0).anomaly, true);
+    assert.equal(classify(levels, last + 2 * sigma, 0).anomaly, false);
+    assert.equal(
+      classify(levels, last + (THRESHOLD + 0.5) * sigma, 0).anomaly,
+      true,
+    );
+  });
+
+  it("reports z consistent with its own expected value and spread", () => {
+    const s = classify(levels, last - 6, 0);
+    const recomputed = (s.value - s.expected) / s.sigma;
+    assert.ok(Math.abs(recomputed - s.z) < 1e-9);
+    assert.ok(s.z < 0);
   });
 });
 
@@ -111,6 +132,13 @@ describe("the stream", () => {
     const a = primedSeries(20260922).map((s) => s.value);
     const b = primedSeries(20260922).map((s) => s.value);
     assert.deepEqual(a, b);
+  });
+
+  it("flags an injected spike", () => {
+    for (const seed of [1, 2, 3, 20260922]) {
+      const stream = createSignalStream(seed, 200);
+      assert.ok(stream.next(8).anomaly, `seed ${seed}`);
+    }
   });
 
   it("differs between seeds", () => {

@@ -15,6 +15,7 @@ export function CircuitBackdrop() {
   return (
     <div aria-hidden="true" className="circuit-backdrop">
       <div className="circuit-grid">
+        <span className="circuit-lit" />
         <span className="circuit-pulse circuit-pulse-h" />
         <span className="circuit-pulse circuit-pulse-v" />
       </div>

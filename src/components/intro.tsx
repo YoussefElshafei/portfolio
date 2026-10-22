@@ -18,10 +18,10 @@ import {
  * the visitor reaches the real widget on the TradeWatch entry.
  *
  * Honest by construction: the points come from the same synthetic stream and
- * the same rolling z-score detector the widget uses (lib/signal.ts), not a
+ * the same robust z-score detector the widget uses (lib/signal.ts), not a
  * scripted animation. The seed was chosen by searching for one where the
  * detector's FIRST flag lands on tick 19, so the intro is short; the flag
- * itself is the detector's own call (z ≈ 6.8).
+ * itself is the detector's own call (z ≈ 5.6).
  *
  * When it plays is decided before React runs, by the inline script in the
  * root layout (INTRO_SCRIPT below): only on the first page view of a browser
@@ -33,7 +33,7 @@ import {
  * Skippable at any point by click, key, touch or scroll.
  */
 
-const SEED = 182;
+const SEED = 360;
 /** Ticks shown. The detector's first flag on this seed is tick 19. */
 const TICKS = 20;
 const TICK_MS = 110;
@@ -45,7 +45,7 @@ const SKIP_LEAVE_MS = 250;
 /** The whole run, computed once. The warm-up is hidden history the rolling
  *  statistics need; only the ticks after it are drawn. */
 const SERIES: readonly Sample[] = (() => {
-  const stream = createSignalStream(SEED, WINDOW);
+  const stream = createSignalStream(SEED, WINDOW + 1);
   return Array.from({ length: TICKS }, () => stream.next());
 })();
 
@@ -59,8 +59,8 @@ const [LO, HI] = (() => {
   let lo = Infinity;
   let hi = -Infinity;
   for (const p of SERIES) {
-    lo = Math.min(lo, p.value, p.mean - THRESHOLD * p.std);
-    hi = Math.max(hi, p.value, p.mean + THRESHOLD * p.std);
+    lo = Math.min(lo, p.value, p.expected - THRESHOLD * p.sigma);
+    hi = Math.max(hi, p.value, p.expected + THRESHOLD * p.sigma);
   }
   // Generous headroom: the flagged spike is the point of the whole thing,
   // and it lands at the extreme of the range by definition.
@@ -169,14 +169,14 @@ export function Intro() {
 
   const band =
     pts.length > 1
-      ? path(pts, (p) => p.mean + THRESHOLD * p.std) +
+      ? path(pts, (p) => p.expected + THRESHOLD * p.sigma) +
         " " +
         [...pts]
           .map((p, i) => ({ p, i }))
           .reverse()
           .map(
             ({ p, i }) =>
-              `L ${x(i).toFixed(1)} ${y(p.mean - THRESHOLD * p.std).toFixed(1)}`,
+              `L ${x(i).toFixed(1)} ${y(p.expected - THRESHOLD * p.sigma).toFixed(1)}`,
           )
           .join(" ") +
         " Z"
@@ -216,7 +216,7 @@ export function Intro() {
             {pts.length > 1 && (
               <>
                 <path
-                  d={path(pts, (p) => p.mean)}
+                  d={path(pts, (p) => p.expected)}
                   fill="none"
                   stroke="var(--edge)"
                   strokeWidth={1}
@@ -284,7 +284,7 @@ export function Intro() {
               <span className="font-mono text-copper">
                 {Math.abs(flag.z).toFixed(1)}σ
               </span>{" "}
-              {flag.z > 0 ? "above" : "below"} its rolling average
+              {flag.z > 0 ? "above" : "below"} its typical move
             </>
           ) : (
             "Watching a synthetic price for unusual moves"

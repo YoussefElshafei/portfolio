@@ -231,6 +231,54 @@ Guard rails that still apply: all of these stay below the trace bus in contrast,
 `aria-hidden` and never the only route to content, everything off screen stops running,
 and everything is static under `prefers-reduced-motion` except user-initiated dragging.
 
+### 2.8 Amendment (2026-10-21): terminal windows, a contact form, an offline chatbot
+
+Requested by the site owner. Each item overrides exactly the rule it names.
+
+- **Terminal windows.** Any terminal-style element uses one frame,
+  `components/ui/terminal-window.tsx`: an 8px radius (`--radius-window`, an
+  exception to the 4px cap in §2.5), three window dots at reduced saturation
+  (the only place red, yellow and green appear, an exception to the
+  one-accent rule in §3.2), a quiet mono title, a mono body. No glow, no
+  scanlines. The dots are decorative and aria-hidden.
+- **Contact form.** Overrides §4 note 4. A "Say hello" form posts to
+  Web3Forms. The visible address and the mailto link stay beside it, and any
+  failure shows a prefilled mailto link instead of a dead end, so the form can
+  never become "the contact form that posts nowhere".
+- **"Ask about me" chatbot.** Answers come from a knowledge base built from the
+  site's own data files, matched in the browser. No network calls, no model,
+  no backend: §4's "Backend: none" still holds. Below a confidence threshold
+  it says it does not know and points to email rather than guessing.
+- **Smooth scrolling.** Stays native (`scroll-behavior: smooth`). Lenis and
+  other scroll libraries remain out, per §1c.
+
+### 2.9 Amendment (2026-10-21, round 2): full width, playable demos, motion
+
+Requested by the site owner after studying adibeldada.com, subhanrazzaq.com,
+adityasri.in and bruno-simon.com. Each item overrides exactly the rule it names.
+
+- **Width.** From About down, text and demos fill the content width
+  (`max-w-wide`), not the 50rem column. The hero keeps the column. The order
+  stays stacked: story, then demo. No story-left/demo-right split.
+- **Demos you play.** Every project has one, each a port of the repo's own
+  rules with tests in `src/lib`, in a shared `DemoFrame` whose caption says
+  what is real and what is simulated. Triage: be the patient, then the staff
+  reviewer. BridgeAid: file reports on the map against the real 3-people /
+  200 m / 10 min rule. WireFish: a shell running the real argument parser.
+  Catan: step through the AI's Template Method turn. TradeWatch: drive the
+  Kafka pipeline (stop and restart consumer groups), inject spikes into the
+  anomaly check, run the backtest, in tabs.
+- **Motion.** Overrides §2.3's "packet motion only" and §2.5's "no shadow" for
+  hover states: a copper edge light follows the cursor on demo panels and
+  cards (`.glow`), small cards lift and tilt slightly, skill chips open a
+  popover, certifications rise in staggered, the circuit backdrop lights up
+  near the cursor, primary buttons lean toward it, a progress trace runs
+  along the top, and the hero prompt types itself once. All of it is CSS
+  variables written by one listener (`PointerFx`), off for touch and reduced
+  motion, and nothing depends on it to be readable.
+- **Project bus.** A small board pinned to the bottom while reading the
+  projects: one chip per project, lit as you scroll, with a hover preview.
+
 ---
 
 ## 3. Type and color

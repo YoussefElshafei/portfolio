@@ -352,6 +352,10 @@ export function ProjectGraph() {
     };
   }, [reduced]);
 
+  // See skill-matrix.tsx: a tap toggles, because touch has no hover and iOS
+  // Safari does not focus a tapped button.
+  const tap = useRef({ touch: false, wasActive: false });
+
   const filterButton = (kind: EdgeKind, key: string) => {
     const active = filter?.kind === kind && filter.key === key;
     return (
@@ -362,11 +366,21 @@ export function ProjectGraph() {
           onMouseLeave={() => setFilter(null)}
           onFocus={() => setFilter({ kind, key })}
           onBlur={() => setFilter(null)}
+          onPointerDown={(e) => {
+            tap.current = {
+              touch: e.pointerType !== "mouse",
+              wasActive: active,
+            };
+          }}
+          onClick={() => {
+            if (!tap.current.touch) return;
+            setFilter(tap.current.wasActive ? null : { kind, key });
+          }}
           aria-pressed={active}
           // A tag is a machine fact and goes in mono; a person's name is not
           // (§2.6). The dashed border ties the name filters to the dashed
           // edges they light.
-          className={`cursor-pointer rounded-trace border px-2 py-1 text-micro ${
+          className={`cursor-pointer rounded-trace border px-2 py-1 text-micro pointer-coarse:min-h-11 ${
             kind === "stack" ? "font-mono" : "border-dashed"
           } ${
             active
@@ -404,28 +418,35 @@ export function ProjectGraph() {
             </svg>
             Shares part of a stack
           </li>
-          <li className="flex items-center gap-2">
-            <svg viewBox="0 0 24 2" className="h-0.5 w-6" aria-hidden="true">
-              <line
-                x1="0"
-                y1="1"
-                x2="24"
-                y2="1"
-                stroke="var(--edge)"
-                strokeDasharray="3 4"
-              />
-            </svg>
-            Built with the same teammate
-          </li>
+          {/* Teammate edges are drawn only when projects name shared
+              teammates. None do at present, so neither key nor filter shows. */}
+          {SHARED_PEOPLE.length > 0 && (
+            <li className="flex items-center gap-2">
+              <svg viewBox="0 0 24 2" className="h-0.5 w-6" aria-hidden="true">
+                <line
+                  x1="0"
+                  y1="1"
+                  x2="24"
+                  y2="1"
+                  stroke="var(--edge)"
+                  strokeDasharray="3 4"
+                />
+              </svg>
+              Built with the same teammate
+            </li>
+          )}
           {/* The only affordance for the drag. Aria-hidden like the graph
               itself: it describes a pointer interaction on a decorative
               element, which is noise to a screen reader. */}
           <li aria-hidden="true" className="ml-auto">
             {/* Under reduced motion there is no moving glow to say "this is
-                interactive", so the same hint is given in words. Static. */}
-            {reduced
-              ? "Hover a project to learn more · drag to turn"
-              : "Drag to turn"}
+                interactive", so the same hint is given in words. Static.
+                Chosen in CSS, not from useReducedMotion: the server cannot
+                know the setting, and a text swap on hydration is a mismatch. */}
+            <span className="motion-safe:hidden">
+              Hover a project to learn more · drag to turn
+            </span>
+            <span className="motion-reduce:hidden">Drag to turn</span>
           </li>
         </ul>
       </div>
@@ -434,16 +455,20 @@ export function ProjectGraph() {
         <h3 className="mb-3 text-micro font-medium text-silk-dim">
           Shared stack
         </h3>
-        <ul className="mb-6 flex flex-wrap gap-2">
+        <ul className="mb-8 flex flex-wrap gap-2">
           {SHARED_TAGS.map((tag) => filterButton("stack", tag))}
         </ul>
 
-        <h3 className="mb-3 text-micro font-medium text-silk-dim">
-          Shared teammate
-        </h3>
-        <ul className="mb-8 flex flex-wrap gap-2">
-          {SHARED_PEOPLE.map((person) => filterButton("people", person))}
-        </ul>
+        {SHARED_PEOPLE.length > 0 && (
+          <>
+            <h3 className="mb-3 text-micro font-medium text-silk-dim">
+              Shared teammate
+            </h3>
+            <ul className="mb-8 flex flex-wrap gap-2">
+              {SHARED_PEOPLE.map((person) => filterButton("people", person))}
+            </ul>
+          </>
+        )}
 
         <h3 className="mb-3 text-micro font-medium text-silk-dim">Projects</h3>
         <ul className="flex flex-col gap-3 md:gap-1.5">
@@ -472,7 +497,7 @@ export function ProjectGraph() {
                   onMouseLeave={() => setCursorNode(null)}
                   onFocus={() => setCursorNode(node.id)}
                   onBlur={() => setCursorNode(null)}
-                  className={`block rounded-trace text-micro ${
+                  className={`block rounded-trace text-micro pointer-coarse:py-1 ${
                     cursorNode === node.id
                       ? "text-copper"
                       : "text-silk-dim hover:text-silk"

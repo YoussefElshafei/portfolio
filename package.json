@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test \"src/**/*.test.ts\""
+    "test": "node --import ./scripts/test-alias.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "leaflet": "^1.9.4",

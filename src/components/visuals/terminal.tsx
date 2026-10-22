@@ -1,291 +1,413 @@
 "use client";
 
-import { useInView, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import {
-  Fragment,
+  useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
-  useSyncExternalStore,
+  type KeyboardEvent,
 } from "react";
+import { TerminalWindow } from "@/components/ui/terminal-window";
+import {
+  HELP,
+  MONITOR_SAMPLES,
+  SCAN_HEADER,
+  argvOf,
+  formatMonitor,
+  formatTrace,
+  monitor,
+  parse,
+  scanCsvRow,
+  scanJson,
+  scanRow,
+  scanTableRow,
+  trace,
+  type CommandLine,
+  type ScanRow,
+} from "@/lib/wirefish";
+import { NO_RESTORE } from "@/lib/no-restore";
 
 /**
- * WireFish, as an illustrative terminal session.
+ * WireFish, as a terminal you can type into.
  *
- * The three invocations are verbatim from the project's README. The OUTPUT is
- * sample data written for this demo. An earlier version of this component
- * refused to show any output at all, on the grounds that invented results are
- * fabricated evidence. That changed at the owner's request, so the honesty
- * now has to live in the labelling instead:
+ * The command line is the real one: lib/wirefish.ts is a port of the tool's
+ * argument parser, so every flag, default and error message is what the C
+ * program would print. The *results* are simulated (a web page cannot open
+ * raw sockets), generated from the target name and using documentation-only
+ * addresses. The title bar and the caption both say so.
  *
- *  - Every output line follows only the fields the README documents: per-host
- *    RTT and success counts for --scan; hop, IP, hostname and RTT for
- *    --trace; instantaneous and averaged RX/TX bitrate for --monitor. No
- *    feature is implied that the tool does not have.
- *  - Every address is private (RFC 1918) or from the ranges reserved for
- *    documentation (RFC 5737), and the trace target uses the reserved
- *    `.example` TLD (RFC 2606), so no line points at a real machine.
- *  - The header says "sample output" and the caption says nothing is running.
- *
- * Real text, not an image or a video: selectable, searchable, and a screen
- * reader gets the full transcript at once rather than a typing animation.
  * Everything inside is a machine fact, so the whole block is mono (§2.6).
  */
 
-type Line =
-  | { kind: "cmd"; text: string }
-  | { kind: "out"; text: string }
-  | { kind: "gap" };
+type Line = { id: number; text: string; tone?: "cmd" | "err" | "dim" | "ok" };
 
-const SESSION: readonly Line[] = [
-  { kind: "cmd", text: "wirefish --scan --subnet 192.168.1.0/24" },
-  { kind: "out", text: "192.168.1.1     up   rtt  1.84 ms   3/3" },
-  { kind: "out", text: "192.168.1.23    up   rtt  4.12 ms   3/3" },
-  { kind: "out", text: "192.168.1.57    up   rtt 11.06 ms   2/3" },
-  { kind: "out", text: "3 hosts up, 254 scanned" },
-  { kind: "gap" },
-  { kind: "cmd", text: "wirefish --trace host.example" },
-  { kind: "out", text: " 1  192.168.1.1    gateway        1.92 ms" },
-  { kind: "out", text: " 2  10.24.0.1      unresolved     8.47 ms" },
-  { kind: "out", text: " 3  198.51.100.14  unresolved    14.30 ms" },
-  { kind: "out", text: " 4  203.0.113.10   host.example  21.65 ms" },
-  { kind: "gap" },
-  { kind: "cmd", text: "wirefish --monitor --iface eth0 --interval 100" },
-  { kind: "out", text: "eth0  rx 1.84 Mbps  tx 212.4 kbps" },
-  { kind: "out", text: "eth0  rx 2.10 Mbps  tx 198.7 kbps" },
-  { kind: "out", text: "eth0  rx 1.97 Mbps  tx 205.6 kbps" },
-  { kind: "out", text: "^C" },
-  { kind: "out", text: "avg   rx 1.97 Mbps  tx 205.6 kbps  (3 samples)" },
+const PROMPT = "you@wirefish:~$";
+const MAX_LINES = 500;
+/** A scan of the full default range prints 1024 rows; past this the demo
+ *  stops printing (the tool would carry on). */
+const MAX_SCAN_ROWS = 2048;
+
+const EXAMPLES = [
+  "wirefish --scan --target scanme.example --ports 1-1024",
+  "wirefish --trace --target host.example",
+  "wirefish --monitor --iface eth0 --interval 250",
+  "wirefish --scan --target db.example --ports 5400-5500 --json",
+  "wirefish --scan --subnet 192.168.1.0/24",
+] as const;
+
+const SHELL_HELP = [
+  "Simulated shell. Commands: wirefish [MODE] [OPTIONS], help, clear",
+  "Try `wirefish --help` for the tool's own usage text.",
 ];
 
-/**
- * The animation as a list of frames, computed once. A frame is a cursor into
- * the session: lines before `line` are fully shown, and line `line` is shown
- * up to `chars` characters. Precomputing it keeps the runtime to a single
- * chain of timeouts and makes the timing identical on every visit.
- */
-type Frame = { line: number; chars: number; wait: number };
+/** Hidden commands for anyone who tries the obvious things. */
+const EGGS: Record<
+  string,
+  { lines: string[]; tone?: Line["tone"]; contact?: boolean }
+> = {
+  sudo: {
+    lines: ["you is not in the sudoers file. This incident will be reported."],
+    tone: "err",
+  },
+  "rm -rf /": {
+    lines: ["rm: nice try. This shell is read-only, and so is my portfolio."],
+    tone: "err",
+  },
+  whoami: { lines: ["you (hopefully a recruiter)"] },
+  ls: { lines: ["projects/  demos/  resume-on-request.txt  .secrets"] },
+  "ls -a": {
+    lines: [".  ..  projects/  demos/  resume-on-request.txt  .secrets"],
+  },
+  "cat .secrets": {
+    lines: ["The GOAT is Cristiano Ronaldo. That's the only secret."],
+    tone: "ok",
+  },
+  siuu: { lines: ["SIUUUUUUU"], tone: "ok" },
+  "hire youssef": {
+    lines: ["Excellent choice. Taking you to the contact section…"],
+    tone: "ok",
+    contact: true,
+  },
+  exit: { lines: ["There is no escape. Try `hire youssef` instead."] },
+  vim: { lines: ["You'd never get out. Try `help`."], tone: "dim" },
+  ping: { lines: ["pong"] },
+};
 
-/**
- * The looping version of the session: the real transcript, then the prompt
- * types `clear` and the screen empties, the way a person resets a real
- * terminal. The erase is motivated rather than a wipe effect, and it is
- * instant because that is what `clear` does.
- */
-const LOOP: readonly Line[] = [...SESSION, { kind: "cmd", text: "clear" }];
-
-/** How long the finished session stays on screen before `clear` is typed. */
-const HOLD_MS = 2500;
-
-const START: Frame = { line: 0, chars: 0, wait: 0 };
-const DONE: Frame = { line: SESSION.length, chars: 0, wait: 0 };
-
-const FRAMES: readonly Frame[] = (() => {
-  const frames: Frame[] = [];
-  LOOP.forEach((l, i) => {
-    if (l.kind === "cmd") {
-      const isClear = i === LOOP.length - 1;
-      // Typing speed varies a little, deterministically, so it reads as a
-      // person rather than a metronome: 28–60ms a keystroke. The very first
-      // keystroke waits longer, a beat on an empty prompt before each run,
-      // and the first key of `clear` carries the hold on the full session.
-      for (let c = 1; c <= l.text.length; c++) {
-        const wait =
-          c === 1 && i === 0
-            ? 600
-            : c === 1 && isClear
-              ? HOLD_MS
-              : 28 + ((c * 37) % 5) * 8;
-        frames.push({ line: i, chars: c, wait });
-      }
-      // Enter. After a command, the tool starts up; after `clear`, the
-      // screen empties and the loop begins again.
-      frames.push(
-        isClear
-          ? { ...START, wait: 260 }
-          : { line: i + 1, chars: 0, wait: 380 },
-      );
-    } else {
-      frames.push({ line: i + 1, chars: 0, wait: l.kind === "gap" ? 520 : 90 });
-    }
-  });
-  return frames;
-})();
-
-const noopSubscribe = () => () => {};
-
-/** Commands wrap only at spaces, never inside `--interval` (see git history). */
-function Command({ text }: { text: string }) {
-  const tokens = text.split(" ");
-  return (
-    <>
-      {tokens.map((token, i) => (
-        <Fragment key={`${token}-${i}`}>
-          {i > 0 && " "}
-          <span className="whitespace-nowrap">{token}</span>
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-function Transcript({
-  session,
-  frame,
-  typing,
-}: {
-  session: readonly Line[];
-  frame: Frame;
-  typing: boolean;
-}) {
-  return (
-    <>
-      {session.map((l, i) => {
-        if (i > frame.line) return null;
-        const partial = i === frame.line;
-        if (partial && (l.kind !== "cmd" || frame.chars === 0)) return null;
-
-        if (l.kind === "gap") {
-          return <span key={i} className="block h-3" />;
-        }
-        if (l.kind === "out") {
-          return (
-            <span key={i} className="block whitespace-pre-wrap text-silk-dim">
-              {l.text}
-            </span>
-          );
-        }
-        const shown = partial ? l.text.slice(0, frame.chars) : l.text;
-        return (
-          <span key={i} className="block whitespace-pre-wrap">
-            <span className="text-copper">$ </span>
-            <span className="text-silk">
-              <Command text={shown} />
-            </span>
-            {partial && typing && <Cursor />}
-          </span>
-        );
-      })}
-      {/* After the last command finishes, an idle prompt. The cursor is
-          steady rather than blinking: the loop itself is the motion here,
-          and a blink on top of it would be noise. */}
-      {frame.line >= session.length && (
-        <span className="block">
-          <span className="text-copper">$ </span>
-          <Cursor />
-        </span>
-      )}
-      {/* Between lines, the cursor waits on an empty prompt line. */}
-      {typing &&
-        frame.line < session.length &&
-        frame.chars === 0 &&
-        session[frame.line].kind === "cmd" && (
-          <span className="block">
-            <span className="text-copper">$ </span>
-            <Cursor />
-          </span>
-        )}
-    </>
-  );
-}
-
-function Cursor() {
-  return (
-    <span className="ml-px inline-block h-[1.1em] w-[0.55em] translate-y-[0.15em] bg-silk-dim" />
-  );
-}
+let nextId = 0;
+const line = (text: string, tone?: Line["tone"]): Line => ({
+  id: nextId++,
+  text,
+  tone,
+});
 
 export function TerminalBlock() {
-  const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
   const reduced = useReducedMotion();
-  // Loops for as long as the block is on screen (DESIGN_BRIEF.md §2.7), and
-  // pauses in place while it is not: no timers running for a terminal nobody
-  // can see. Scrolling back resumes mid-session rather than restarting.
-  const inView = useInView(ref, { amount: 0.4 });
-  const position = useRef(0);
-
-  // The server render, and the render that hydrates it, show the finished
-  // transcript: full content without JavaScript, and nothing to mismatch.
-  // useSyncExternalStore reports false for both of those and true on every
-  // client render after, which is the sanctioned way to branch on "running
-  // in the browser now" without setting state in an effect. The animation
-  // only takes over from there, and only if motion is allowed.
-  const hydrated = useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false,
-  );
-  const animate = hydrated && reduced === false;
-  const [frame, setFrame] = useState<Frame>(START);
-  const shown = animate ? frame : DONE;
+  const [lines, setLines] = useState<Line[]>(() => [
+    line("WireFish demo shell · output is simulated", "dim"),
+    line("Type a command or tap one below. `help` lists what works.", "dim"),
+  ]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [ports, setPorts] = useState<ScanRow[]>([]);
+  const history = useRef<string[]>([]);
+  const cursor = useRef(-1);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cancel = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (!animate || !inView) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const step = () => {
-      const f = FRAMES[position.current];
-      timer = setTimeout(() => {
-        setFrame(f);
-        // The last frame is the post-`clear` blank screen; wrap to the top.
-        position.current = (position.current + 1) % FRAMES.length;
-        step();
-      }, f.wait);
-    };
-    step();
-    return () => clearTimeout(timer);
-  }, [animate, inView]);
+    const s = screenRef.current;
+    if (s) s.scrollTop = s.scrollHeight;
+  }, [lines]);
 
-  const typing = animate && shown.line < LOOP.length;
+  useEffect(() => () => cancel.current(), []);
+
+  const print = useCallback((...ls: Line[]) => {
+    setLines((prev) => [...prev, ...ls].slice(-MAX_LINES));
+  }, []);
+
+  /** Runs `steps` one after another, `ms` apart (instantly under reduced
+   *  motion), and can be stopped with Ctrl+C. */
+  const play = useCallback(
+    (steps: (() => void)[], ms: number) => {
+      setBusy(true);
+      let i = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stop = () => {
+        if (timer) clearTimeout(timer);
+        setBusy(false);
+      };
+      cancel.current = () => {
+        if (timer) clearTimeout(timer);
+        setBusy(false);
+      };
+      const tick = () => {
+        if (i >= steps.length) return stop();
+        steps[i++]();
+        timer = setTimeout(tick, reduced ? 0 : ms);
+      };
+      tick();
+    },
+    [reduced],
+  );
+
+  function runScan(cmd: CommandLine) {
+    const total = cmd.portsTo - cmd.portsFrom + 1;
+    const count = Math.min(total, MAX_SCAN_ROWS);
+    const rows = Array.from({ length: count }, (_, k) =>
+      scanRow(cmd.target, cmd.portsFrom + k),
+    );
+    setPorts([]);
+    if (cmd.json) {
+      setPorts(rows);
+      print(line(scanJson(rows)));
+      return;
+    }
+    const head = cmd.csv ? ["port,state,latency_ms"] : SCAN_HEADER;
+    const fmt = cmd.csv ? scanCsvRow : scanTableRow;
+    const CHUNK = 48;
+    const steps: (() => void)[] = [() => print(...head.map((h) => line(h)))];
+    for (let k = 0; k < rows.length; k += CHUNK) {
+      const chunk = rows.slice(k, k + CHUNK);
+      steps.push(() => {
+        print(
+          ...chunk.map((r) =>
+            line(fmt(r), r.state === "open" ? "ok" : undefined),
+          ),
+        );
+        setPorts((p) => [...p, ...chunk]);
+      });
+    }
+    if (total > count)
+      steps.push(() =>
+        print(line(`… demo stops printing after ${MAX_SCAN_ROWS} rows`, "dim")),
+      );
+    play(steps, 45);
+  }
+
+  function runTrace(cmd: CommandLine) {
+    const out = formatTrace(trace(cmd), cmd);
+    setPorts([]);
+    // A table header prints at once; each hop arrives as its probe returns.
+    const headLen = cmd.json ? 0 : cmd.csv ? 1 : 2;
+    const steps: (() => void)[] = [];
+    if (headLen)
+      steps.push(() => print(...out.slice(0, headLen).map((t) => line(t))));
+    for (const t of out.slice(headLen)) steps.push(() => print(line(t)));
+    play(steps, 260);
+  }
+
+  function runMonitor(cmd: CommandLine) {
+    setPorts([]);
+    const samples = monitor(cmd);
+    const iface = cmd.iface || "eth0";
+    // Like the tool, collect first (10 samples at --interval) and print the
+    // table at the end. Capped at 300 ms a sample so the demo never stalls.
+    const steps: (() => void)[] = [];
+    for (let k = 1; k <= MONITOR_SAMPLES; k++)
+      steps.push(() =>
+        setLines((prev) => {
+          const text = `sampling ${iface} ${"▮".repeat(k)}${"▯".repeat(MONITOR_SAMPLES - k)} ${k}/${MONITOR_SAMPLES}`;
+          const last = prev[prev.length - 1];
+          return last?.text.startsWith("sampling ")
+            ? [...prev.slice(0, -1), { ...last, text }]
+            : [...prev, line(text, "dim")];
+        }),
+      );
+    steps.push(() => print(...formatMonitor(samples, cmd).map((t) => line(t))));
+    play(steps, Math.min(cmd.intervalMs, 300));
+  }
+
+  function run(raw: string) {
+    const text = raw.trim();
+    print(line(`${PROMPT} ${text}`, "cmd"));
+    setDraft("");
+    if (!text) return;
+    history.current = [...history.current, text].slice(-50);
+    cursor.current = -1;
+    const argv = argvOf(text);
+    const [prog, ...args] = argv;
+    if (prog === "clear") {
+      setLines([]);
+      setPorts([]);
+      return;
+    }
+    if (prog === "help") return print(...SHELL_HELP.map((t) => line(t, "dim")));
+    // Easter eggs. Not listed in `help`, on purpose.
+    const key = [text.toLowerCase(), prog].find((k) => Object.hasOwn(EGGS, k));
+    const egg = key ? EGGS[key] : undefined;
+    if (egg) {
+      print(...egg.lines.map((t) => line(t, egg.tone)));
+      if (egg.contact)
+        document
+          .getElementById("contact")
+          ?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (prog !== "wirefish" && prog !== "./wirefish")
+      return print(line(`${prog}: command not found (try \`help\`)`, "err"));
+    const parsed = parse(args);
+    if (parsed.kind === "help")
+      return print(...HELP.split("\n").map((t) => line(t)));
+    if (parsed.kind === "error") return print(line(parsed.message, "err"));
+    const { cmd } = parsed;
+    if (cmd.mode === "scan") runScan(cmd);
+    else if (cmd.mode === "trace") runTrace(cmd);
+    else runMonitor(cmd);
+  }
+
+  function onKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!busy) run(draft);
+    } else if (e.key === "c" && e.ctrlKey && busy) {
+      e.preventDefault();
+      cancel.current();
+      print(line("^C", "dim"));
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const h = history.current;
+      if (!h.length) return;
+      e.preventDefault();
+      let c = cursor.current;
+      c =
+        e.key === "ArrowUp"
+          ? c < 0
+            ? h.length - 1
+            : Math.max(0, c - 1)
+          : c + 1;
+      if (c >= h.length) {
+        cursor.current = -1;
+        setDraft("");
+      } else {
+        cursor.current = c;
+        setDraft(h[c]);
+      }
+    }
+  }
+
+  const open = ports.filter((p) => p.state === "open").length;
 
   return (
-    <figure className="mt-8 w-full max-w-column">
-      <div className="overflow-hidden rounded-trace border border-hairline bg-surface">
-        <div className="flex items-baseline justify-between border-b border-hairline px-4 py-2.5">
-          <span className="font-mono text-micro text-silk-dim">wirefish</span>
-          <span className="font-mono text-micro text-silk-faint">
-            sample output
-          </span>
+    <figure className="mt-8 w-full">
+      <TerminalWindow
+        title="wirefish"
+        meta="simulated output"
+        bodyClassName=""
+        className="glow"
+      >
+        <div
+          ref={screenRef}
+          role="log"
+          aria-live="polite"
+          aria-label="Terminal output"
+          onClick={() => inputRef.current?.focus()}
+          className="h-[22rem] overflow-y-auto px-4 pt-4 text-micro leading-relaxed"
+        >
+          {lines.map((l) => (
+            <pre
+              key={l.id}
+              className={`break-all whitespace-pre-wrap ${
+                l.tone === "cmd"
+                  ? "text-silk"
+                  : l.tone === "err"
+                    ? "text-copper"
+                    : l.tone === "ok"
+                      ? "text-signal"
+                      : l.tone === "dim"
+                        ? "text-silk-faint"
+                        : "text-silk-dim"
+              }`}
+            >
+              {l.text || " "}
+            </pre>
+          ))}
+          <div className="flex items-baseline gap-2 pb-4">
+            <label htmlFor={`${id}-cmd`} className="shrink-0 text-copper">
+              {PROMPT}
+              <span className="sr-only"> command</span>
+            </label>
+            <input
+              ref={inputRef}
+              id={`${id}-cmd`}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKey}
+              disabled={busy}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              maxLength={200}
+              placeholder={busy ? "running… (Ctrl+C)" : "wirefish --help"}
+              className="min-h-8 min-w-0 flex-1 bg-transparent text-silk caret-copper placeholder:text-silk-faint pointer-coarse:min-h-11"
+            />
+          </div>
         </div>
 
-        {/*
-          Two layers in one grid cell. The invisible one is the finished
-          transcript and fixes the height from the start, so the block never
-          grows as lines appear and the page below never shifts. The visible
-          one is the animation. A screen reader gets the sr-only transcript,
-          whole, instead of either.
-        */}
-        <div ref={ref} className="px-4 py-4">
-          <pre className="font-mono text-micro leading-relaxed">
-            <code className="grid">
-              <span className="sr-only">
-                {SESSION.map((l) =>
-                  l.kind === "gap"
-                    ? "\n"
-                    : `${l.kind === "cmd" ? "$ " : ""}${l.text}\n`,
-                ).join("")}
-              </span>
-              <span
-                aria-hidden="true"
-                className="invisible col-start-1 row-start-1"
-              >
-                <Transcript session={SESSION} frame={DONE} typing={false} />
-              </span>
-              <span aria-hidden="true" className="col-start-1 row-start-1">
-                <Transcript
-                  session={animate ? LOOP : SESSION}
-                  frame={shown}
-                  typing={typing}
+        {ports.length > 0 && (
+          <div className="border-t border-hairline px-4 py-3">
+            <p className="mb-2 text-micro text-silk-faint">
+              ports {ports[0].port}–{ports[ports.length - 1].port} ·{" "}
+              <span className="text-signal">{open} open</span> ·{" "}
+              {ports.filter((p) => p.state === "filtered").length} filtered
+            </p>
+            {/* One cell per port scanned, as a picture of the table above.
+                Decorative: the table is the content. */}
+            <div aria-hidden="true" className="flex flex-wrap gap-px">
+              {ports.slice(0, 1024).map((p) => (
+                <span
+                  key={p.port}
+                  title={`${p.port} ${p.state}`}
+                  className={`size-1.5 ${
+                    p.state === "open"
+                      ? "bg-signal"
+                      : p.state === "filtered"
+                        ? "bg-copper"
+                        : "bg-hairline"
+                  }`}
                 />
-              </span>
-            </code>
-          </pre>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex}
+              type="button"
+              {...NO_RESTORE}
+              disabled={busy}
+              onClick={() => run(ex)}
+              className="inline-flex min-h-8 max-w-full cursor-pointer items-center truncate rounded-trace border border-hairline px-2 text-left text-micro text-silk-dim hover:border-copper hover:text-copper disabled:cursor-wait disabled:opacity-50 pointer-coarse:min-h-11"
+            >
+              {ex.replace("wirefish ", "")}
+            </button>
+          ))}
+          {busy && (
+            <button
+              type="button"
+              onClick={() => {
+                cancel.current();
+                print(line("^C", "dim"));
+              }}
+              className="inline-flex min-h-8 cursor-pointer items-center rounded-trace border border-copper px-2 text-micro text-copper pointer-coarse:min-h-11"
+            >
+              Ctrl+C
+            </button>
+          )}
         </div>
-      </div>
+      </TerminalWindow>
       <figcaption className="mt-3 text-micro text-silk-faint">
-        An illustrative session. The commands are the tool&apos;s real,
-        documented interface; the output is sample data written for this page,
-        in the format the README describes, using reserved example addresses.
-        Nothing here is connected to a running scanner.
+        Type real WireFish commands. The parser is a line-for-line port of the
+        tool&apos;s C argument handling, so flags, defaults and error messages
+        are exactly what the program prints (try the last example: WireFish has
+        no <code className="font-mono">--subnet</code> flag). The table, CSV and
+        JSON layouts match its formatter. The results themselves are simulated,
+        since a web page cannot send raw network traffic, and every address is a
+        reserved example address.
       </figcaption>
     </figure>
   );

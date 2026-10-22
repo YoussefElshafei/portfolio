@@ -39,7 +39,12 @@ const TICK_MS_REDUCED = 4000;
  *  genuine spike arrives. */
 function halfDomain(points: readonly Sample[]): number {
   let max = 0;
-  for (const p of points) max = Math.max(max, Math.abs(p.value));
+  // The band too, not just the line: the band is the point of the chart, so
+  // it should not be clipped at the edges.
+  for (const p of points) {
+    const reach = Number.isFinite(p.sigma) ? THRESHOLD * p.sigma : 0;
+    max = Math.max(max, Math.abs(p.value), Math.abs(p.expected) + reach);
+  }
   return Math.max(8, Math.ceil(max) + 1);
 }
 
@@ -130,6 +135,15 @@ export function LiveSignal() {
     };
   }, [reduced, inView]);
 
+  /** Pushes one extra tick with a move of `shock` σ added, so a visitor can
+   *  test the threshold instead of waiting for the series to do it. */
+  const inject = (shock: number) => {
+    streamRef.current ??= createSignalStream(SEED, PRIMED_TICKS);
+    const next = streamRef.current.next(shock);
+    setPoints((prev) => [...prev.slice(-(VIEW - 1)), next]);
+    if (next.anomaly) setFlag(next);
+  };
+
   const latest = points[points.length - 1];
   const half = halfDomain(points);
 
@@ -143,10 +157,10 @@ export function LiveSignal() {
         `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`,
     )
     .join(" ");
-  const meanLine = points
+  const expectedLine = points
     .map(
       (p, i) =>
-        `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.mean).toFixed(1)}`,
+        `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.expected).toFixed(1)}`,
     )
     .join(" ");
 
@@ -155,7 +169,7 @@ export function LiveSignal() {
   const newestFlag = newestFlagIndex >= 0 ? points[newestFlagIndex] : null;
 
   /*
-   * The band is mean ± THRESHOLD·σ: exactly the region the detector treats as
+   * The band is expected ± THRESHOLD·σ: exactly the region the detector treats as
    * normal. A point is flagged precisely when the line leaves the band, so the
    * whole idea of the check is visible without reading a word.
    */
@@ -163,7 +177,7 @@ export function LiveSignal() {
     points
       .map(
         (p, i) =>
-          `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.mean + THRESHOLD * p.std).toFixed(1)}`,
+          `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.expected + THRESHOLD * p.sigma).toFixed(1)}`,
       )
       .join(" ") +
     " " +
@@ -172,14 +186,17 @@ export function LiveSignal() {
       .reverse()
       .map(
         ({ p, i }) =>
-          `L ${x(i).toFixed(1)} ${y(p.mean - THRESHOLD * p.std).toFixed(1)}`,
+          `L ${x(i).toFixed(1)} ${y(p.expected - THRESHOLD * p.sigma).toFixed(1)}`,
       )
       .join(" ") +
     " Z";
 
   return (
-    <figure ref={figureRef} className="mt-8 w-full max-w-column">
-      <div className="overflow-hidden rounded-trace border border-hairline bg-surface">
+    <figure ref={figureRef} className="mt-8 w-full">
+      <div
+        data-glow
+        className="glow overflow-hidden rounded-trace border border-hairline bg-surface"
+      >
         {/* Header, styled as a small trading monitor: what this is, then
             the instrument and its last price. */}
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hairline px-4 py-2.5">
@@ -202,6 +219,23 @@ export function LiveSignal() {
           <span className="font-mono text-h3 text-silk tabular-nums">
             {price(latest?.value ?? Number.NaN)}
           </span>
+          <span className="ml-auto flex gap-2">
+            {(
+              [
+                [2, "Nudge +2σ"],
+                [8, "Inject a spike +8σ"],
+              ] as const
+            ).map(([shock, label]) => (
+              <button
+                key={shock}
+                type="button"
+                onClick={() => inject(shock)}
+                className="inline-flex min-h-8 cursor-pointer items-center rounded-trace border border-hairline px-2.5 font-mono text-micro text-silk-dim transition-colors hover:border-copper hover:text-copper active:translate-y-px pointer-coarse:min-h-11"
+              >
+                {label}
+              </button>
+            ))}
+          </span>
         </div>
 
         <div className="relative mx-4 mt-3">
@@ -212,12 +246,12 @@ export function LiveSignal() {
             focusable="false"
             preserveAspectRatio="none"
           >
-            {/* Normal range: mean ± threshold·σ. Leaving it is what gets a
+            {/* Normal range: expected ± threshold·σ. Leaving it is what gets a
                 point flagged. */}
             <path d={band} fill="var(--silk)" fillOpacity={0.05} />
-            {/* rolling mean: the baseline each point is judged against */}
+            {/* expected: previous price plus the median move of the window */}
             <path
-              d={meanLine}
+              d={expectedLine}
               fill="none"
               stroke="var(--edge)"
               strokeWidth={1}
@@ -235,7 +269,7 @@ export function LiveSignal() {
             {/* flagged points, in the accent already defined for the system */}
             {flagged.map(({ p, i }) => (
               <g key={p.t}>
-                {i === newestFlagIndex && !reduced && (
+                {i === newestFlagIndex && (
                   <circle
                     className="signal-pulse"
                     cx={x(i)}
@@ -299,8 +333,8 @@ export function LiveSignal() {
           {(
             [
               ["price", price(latest?.value ?? Number.NaN)],
-              ["mean", price(latest?.mean ?? Number.NaN)],
-              ["σ", fmt(latest?.std ?? Number.NaN)],
+              ["expected", price(latest?.expected ?? Number.NaN)],
+              ["σ", fmt(latest?.sigma ?? Number.NaN)],
               ["z", fmt(latest?.z ?? Number.NaN)],
             ] as const
           ).map(([label, value]) => (
@@ -331,29 +365,33 @@ export function LiveSignal() {
               <span className="font-mono text-copper">{tickLabel(flag.t)}</span>{" "}
               Flagged:{" "}
               <span className="font-mono">{fmt(Math.abs(flag.z), 1)}</span>{" "}
-              standard deviations {flag.z > 0 ? "above" : "below"} the rolling
-              mean.
+              robust standard deviations {flag.z > 0 ? "above" : "below"} the
+              expected move.
             </>
           ) : (
-            <>Watching. Nothing outside {THRESHOLD}σ of the rolling mean yet.</>
+            <>Watching. No move beyond {THRESHOLD}σ yet.</>
           )}
         </p>
       </div>
 
       <figcaption className="mt-3 text-micro text-silk-faint">
-        A simplified live demo of the same statistical check{" "}
+        A simplified version of the baseline check{" "}
         <a
           href="#work-tradewatch"
           className="text-silk-dim underline decoration-hairline underline-offset-2 hover:text-copper hover:decoration-copper"
         >
           TradeWatch
         </a>{" "}
-        runs against real market data. The prices are synthetic, generated in
-        your browser from a fixed seed. The shaded band is the normal range: the
-        rolling average of the last {WINDOW} points, plus or minus {THRESHOLD}{" "}
-        standard deviations. A point outside it is flagged as unusual for this
-        series, which is not the same as fraud or manipulation. The detector
-        never knows in advance where the jumps are.
+        runs on every one-minute bar. The prices are synthetic, generated in
+        your browser from a fixed seed. Each move is compared with the last{" "}
+        {WINDOW} moves using the median and median absolute deviation, which a
+        single spike cannot drag around the way it drags an average. The shaded
+        band is the normal range; a move more than {THRESHOLD} robust standard
+        deviations out is flagged as unusual for this series, which is not the
+        same as fraud or manipulation. TradeWatch scores several features this
+        way (return, volatility, volume, trade count); this demo scores one. The
+        buttons push one extra move through the check: a 2σ nudge usually stays
+        inside the band, an 8σ spike leaves it.
       </figcaption>
     </figure>
   );

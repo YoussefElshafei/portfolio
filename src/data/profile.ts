@@ -18,7 +18,7 @@ export const EDUCATION = {
    * On the 4-point scale, per McMaster's own conversion from its 12-point
    * scale (confirmed by the owner).
    */
-  gpa: "4.0 / 4.0",
+  gpa: "3.9+ / 4.0",
 } as const;
 
 /**
@@ -98,23 +98,25 @@ export type Certification = {
 
 export const CERTIFICATIONS: readonly Certification[] = [
   {
+    name: "Exploring Cybersecurity",
+    issuer: "IBM SkillsBuild",
+    date: "Sep 2026",
+  },
+  {
     name: "DELF B1 — French Language Diploma",
     issuer: "Ministère de l'Éducation nationale",
     date: "Jul 2024",
     note: "Certified independent user, CEFR B1 level.",
-  },
-  {
-    name: "Exploring Cybersecurity",
-    issuer: "IBM SkillsBuild",
-    date: "Sep 2026",
   },
 ];
 
 export type InvolvementKind = "ROLE" | "SOCIETY" | "COMPETITION" | "CLUB";
 
 export type InvolvementEntry = {
+  /** The heading: what it is (the club, the competition, the role). */
   title: string;
-  org: string;
+  /** The line under it: his part in it. */
+  role: string;
   kind: InvolvementKind;
   /**
    * Only where a date range is actually confirmed. Omitted rather than
@@ -126,41 +128,44 @@ export type InvolvementEntry = {
 };
 
 /**
- * One timeline for experience and involvement together. The tutoring role
- * used to be its own "Experience" section of one entry; it now leads this
- * list, as the only entry with a confirmed date range.
+ * One timeline for experience and involvement together. The organisation or
+ * event is the heading and his part in it sits underneath (owner's call,
+ * 2026-10-21): "Google Developer Group" is what a reader scans for, "Member"
+ * is not. The tutoring role keeps the role as its heading because the role is
+ * the thing.
  */
 export const INVOLVEMENT: readonly InvolvementEntry[] = [
   {
     title: "Academic Tutor & Peer Mentor",
-    org: "Local community, volunteer & paid",
+    role: "Local community, volunteer & paid",
     kind: "ROLE",
     period: "2025—Present",
     description:
       "Taught the fundamentals of coding and logical thinking to children in the local community. Designed simple Python and Scratch projects to build curiosity and confidence, and encouraged teamwork, creativity and persistence in problem-solving.",
   },
   {
-    title: "Active member",
-    org: "McMaster Software Engineering Society & Engineering and Management Society",
+    title:
+      "McMaster Software Engineering Society & Engineering and Management Society",
+    role: "Active member",
     kind: "SOCIETY",
     description: "Technical workshops, peer learning and industry events.",
   },
   {
-    title: "Top 5 finish",
-    org: "McMaster Engineering Software Competition",
+    title: "McMaster Engineering Software Competition",
+    role: "Top 5 finish",
     kind: "COMPETITION",
     description: "Placed top 5 of all contestants.",
   },
   {
-    title: "Team member",
-    org: "United Nations Sustainable Development Goals Competition",
+    title: "United Nations Sustainable Development Goals Competition",
+    role: "Team member",
     kind: "COMPETITION",
     description:
       "Multidisciplinary team building a tech-driven solution aligned with UN SDGs.",
   },
   {
-    title: "Member",
-    org: "Google Developer Group on Campus, McMaster University",
+    title: "Google Developer Group on Campus",
+    role: "Member · McMaster University",
     kind: "CLUB",
     description:
       "Participates in workshops and community events centered on Google's developer tools and cloud technologies.",

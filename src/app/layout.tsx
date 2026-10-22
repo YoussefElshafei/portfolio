@@ -6,7 +6,10 @@ import { SiteHeader } from "@/components/nav/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TraceBus } from "@/components/nav/trace-bus";
 import { CircuitBackdrop } from "@/components/visuals/circuit-backdrop";
+import { PointerFx } from "@/components/motion/pointer-fx";
+import { EasterEggs } from "@/components/motion/easter-eggs";
 import { INTRO_SCRIPT, Intro } from "@/components/intro";
+import { AskLauncher } from "@/components/ask/ask-launcher";
 import { NavStateProvider, NAV_END_ID } from "@/lib/nav-state";
 import { SITE } from "@/config/site";
 import { PROJECTS } from "@/data/projects";
@@ -90,7 +93,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             marks things that are blank without JS (the graph canvas), which
             are better absent than empty. */}
         <noscript>
-          <style>{`[data-reveal]{opacity:1!important;transform:none!important}[data-js-only]{display:none!important}`}</style>
+          <style>{`[data-reveal],[data-stagger]>*{opacity:1!important;transform:none!important}[data-js-only]{display:none!important}`}</style>
         </noscript>
       </head>
       <body
@@ -111,6 +114,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </a>
 
         <CircuitBackdrop />
+        <PointerFx />
+        <EasterEggs />
         <Intro />
 
         <NavStateProvider>
@@ -133,6 +138,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div id={NAV_END_ID} aria-hidden="true" className="h-px" />
           </div>
         </NavStateProvider>
+
+        {/* "Ask about me": offline, lazy-loaded on first open. */}
+        <AskLauncher />
       </body>
     </html>
   );
